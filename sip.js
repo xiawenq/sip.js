@@ -16,7 +16,7 @@ function debug(e) {
     util.debug(util.inspect(e));
 }
 
-function toBase64(s) { 
+function toBase64(s) {
   switch(s.length % 3) {
   case 1:
     s += '  ';
@@ -40,7 +40,7 @@ function parseResponse(rs, m) {
     m.reason = r[3];
 
     return m;
-  }  
+  }
 }
 
 function parseRequest(rq, m) {
@@ -68,8 +68,8 @@ function applyRegex(regex, data) {
 function parseParams(data, hdr) {
   hdr.params = hdr.params || {};
 
-  var re = /\s*;\s*([\w\-.!%*_+`'~]+)(?:\s*=\s*([\w\-.!%*_+`'~]+|"[^"\\]*(\\.[^"\\]*)*"))?/g; 
-  
+  var re = /\s*;\s*([\w\-.!%*_+`'~]+)(?:\s*=\s*([\w\-.!%*_+`'~]+|"[^"\\]*(\\.[^"\\]*)*"))?/g;
+
   for(var r = applyRegex(re, data); r; r = applyRegex(re, data)) {
     hdr.params[r[1].toLowerCase()] = r[2] || null;
   }
@@ -271,7 +271,7 @@ function stringifyUri(uri) {
   if(uri.headers) {
     var h = Object.keys(uri.headers).map(function(x){return x+'='+uri.headers[x];}).join('&');
     if(h.length)
-      s += '?' + h; 
+      s += '?' + h;
   }
   return s;
 }
@@ -279,7 +279,7 @@ function stringifyUri(uri) {
 exports.stringifyUri = stringifyUri;
 
 function stringifyAOR(aor) {
-  return (aor.name || '') + ' <' + stringifyUri(aor.uri) + '>'+stringifyParams(aor.params); 
+  return (aor.name || '') + ' <' + stringifyUri(aor.uri) + '>'+stringifyParams(aor.params);
 }
 
 function stringifyAuthHeader(a) {
@@ -313,7 +313,7 @@ var stringifiers = {
   from: function(h) {
     return 'From: '+stringifyAOR(h)+'\r\n';
   },
-  contact: function(h) { 
+  contact: function(h) {
     return 'Contact: '+ ((h !== '*' && h.length) ? h.map(stringifyAOR).join(', ') : '*') + '\r\n';
   },
   route: function(h) {
@@ -322,23 +322,23 @@ var stringifiers = {
   'record-route': function(h) {
     return h.length ? 'Record-Route: ' + h.map(stringifyAOR).join(', ') + '\r\n' : '';
   },
-  'path': function(h) { 
+  'path': function(h) {
     return h.length ? 'Path: ' + h.map(stringifyAOR).join(', ') + '\r\n' : '';
   },
-  cseq: function(cseq) { 
+  cseq: function(cseq) {
     return 'CSeq: '+cseq.seq+' '+cseq.method+'\r\n';
   },
-  'www-authenticate': function(h) { 
+  'www-authenticate': function(h) {
     return h.map(function(x) { return 'WWW-Authenticate: '+stringifyAuthHeader(x)+'\r\n'; }).join('');
   },
-  'proxy-authenticate': function(h) { 
+  'proxy-authenticate': function(h) {
     return h.map(function(x) { return 'Proxy-Authenticate: '+stringifyAuthHeader(x)+'\r\n'; }).join('');
   },
   'authorization': function(h) {
     return h.map(function(x) { return 'Authorization: ' + stringifyAuthHeader(x) + '\r\n'}).join('');
   },
   'proxy-authorization': function(h) {
-    return h.map(function(x) { return 'Proxy-Authorization: ' + stringifyAuthHeader(x) + '\r\n'}).join('');; 
+    return h.map(function(x) { return 'Proxy-Authorization: ' + stringifyAuthHeader(x) + '\r\n'}).join('');;
   },
   'authentication-info': function(h) {
     return 'Authentication-Info: ' + stringifyAuthHeader(h) + '\r\n';
@@ -365,13 +365,13 @@ function stringify(m) {
 
   for(var n in m.headers) {
     if(typeof m.headers[n] !== "undefined") {
-      if(typeof m.headers[n] === 'string' || !stringifiers[n]) 
+      if(typeof m.headers[n] === 'string' || !stringifiers[n])
         s += prettifyHeaderName(n) + ': ' + m.headers[n] + '\r\n';
       else
         s += stringifiers[n](m.headers[n], n);
     }
   }
-  
+
   s += '\r\n';
 
   if(m.content)
@@ -428,7 +428,7 @@ exports.copyMessage = function(msg, deep) {
     content: msg.content
   };
 
-  // always copy via array 
+  // always copy via array
   r.headers.via = clone(msg.headers.via);
 
   return r;
@@ -446,7 +446,7 @@ function makeStreamParser(onMessage, onFlood, maxBytesHeaders, maxContentLength)
 
   var m;
   var r = '';
-  
+
   function headers(data) {
     r += data;
 
@@ -489,9 +489,9 @@ function makeStreamParser(onMessage, onFlood, maxBytesHeaders, maxContentLength)
 
     if(r.length >= m.headers['content-length']) {
       m.content = r.substring(0, m.headers['content-length']);
-      
+
       onMessage(m);
-      
+
       var s = r.substring(m.headers['content-length']);
       state = headers;
       r = '';
@@ -519,7 +519,7 @@ function parseMessage(s) {
       else {
         m.content = r[2];
       }
-      
+
       return m;
     }
   }
@@ -572,23 +572,23 @@ function makeStreamTransport(protocol, maxBytesHeaders, maxContentLength, connec
 
     stream.setEncoding('binary');
     stream.on('data', makeStreamParser( onMessage, onFlood, maxBytesHeaders, maxContentLength));
-  
+
     stream.on('close',    function() {
-      if(flowid) delete flows[flowid]; 
+      if(flowid) delete flows[flowid];
       delete remotes[remoteid];
     });
     stream.on('connect',  register_flow);
 
     stream.on('error',    function() {});
-    stream.on('end',      function() { 
+    stream.on('end',      function() {
       if(refs !== 0) stream.emit('error', new Error('remote peer disconnected'));
       stream.end();
     });
 
     stream.on('timeout',  function() { if(refs === 0) stream.destroy(); });
-    stream.setTimeout(120000);   
+    stream.setTimeout(120000);
     stream.setMaxListeners(10000);
- 
+
     remotes[remoteid] = function(onError) {
       ++refs;
       if(onError) stream.on('error', onError);
@@ -611,7 +611,7 @@ function makeStreamTransport(protocol, maxBytesHeaders, maxContentLength, connec
   }
 
   var server = createServer(function(stream) {
-    init(stream, {protocol: protocol, address: stream.remoteAddress, port: stream.remotePort});  
+    init(stream, {protocol: protocol, address: stream.remoteAddress, port: stream.remotePort});
   });
 
   return {
@@ -634,13 +634,16 @@ function makeStreamTransport(protocol, maxBytesHeaders, maxContentLength, connec
 
 function makeTlsTransport(options, callback) {
   return makeStreamTransport(
-    'TLS', 
+    'TLS',
     options.maxBytesHeaders,
     options.maxContentLength,
-    function(port, host, callback) { return tls.connect(port, host, options.tls, callback); }, 
+    function(port, host, callback) { return tls.connect(port, host, options.tls, callback); },
     function(callback) {
       var server = tls.createServer(options.tls, callback);
       server.listen(options.tls_port || 5061, options.address);
+      if(options.logger && options.logger.info) {
+        options.logger.info("Listening %s:%d/TLS ...", options.address? options.address : "0.0.0.0", options.tls_port || 5061);
+      }
       return server;
     },
     callback);
@@ -652,9 +655,12 @@ function makeTcpTransport(options, callback) {
     options.maxBytesHeaders,
     options.maxContentLength,
     function(port, host, callback) { return net.connect(port, host, callback); },
-    function(callback) { 
+    function(callback) {
       var server = net.createServer(callback);
       server.listen(options.port || 5060, options.address);
+      if(options.logger && options.logger.info) {
+        options.logger.info("Listening %s:%d/TCP ...", options.address? options.address : "0.0.0.0", options.port);
+      }
       return server;
     },
     callback);
@@ -664,7 +670,7 @@ function makeWsTransport(options, callback) {
   var flows = Object.create(null);
   var clients = Object.create(null);
 
-  
+
   function init(ws) {
     var remote = {address: ws._socket.remoteAddress, port: ws._socket.remotePort},
         local = {address: ws._socket.address().address, port: ws._socket.address().port},
@@ -687,13 +693,13 @@ function makeWsTransport(options, callback) {
     var socket = new WebSocket(uri, 'sip', {procotol: 'sip'}),
         queue = [],
         refs = 0;
-    
+
     function send_connecting(m) { queue.push(stringify(m)); }
     function send_open(m) { socket.send(new Buffer.from(typeof m === 'string' ? m : stringify(m), 'binary')); }
     var send = send_connecting;
 
-    socket.on('open', function() { 
-      init(socket); 
+    socket.on('open', function() {
+      init(socket);
       send = send_open;
       queue.splice(0).forEach(send);
     });
@@ -718,17 +724,20 @@ function makeWsTransport(options, callback) {
     if(options.tls) {
       var http = require('https');
       var server = new WebSocket.Server({
-          server: http.createServer(options.tls, function(rq,rs) { 
+          server: http.createServer(options.tls, function(rq,rs) {
             rs.writeHead(200);
             rs.end("");
           }).listen(options.ws_port)
       });
-    } 
+    }
     else {
       var server = new WebSocket.Server({port:options.ws_port});
     }
 
     server.on('connection',init);
+    if(options.logger && options.logger.info) {
+      options.logger.info("Listening ws[s]://%s:%d ...", "0.0.0.0", options.ws_port);
+    }
   }
 
   function get(flow) {
@@ -749,7 +758,7 @@ function makeWsTransport(options, callback) {
 
   function open(target, onError) {
     if(target.local)
-      return get(target); 
+      return get(target);
     else
       return makeClient('ws://'+target.host+':'+target.port)(onError);
   }
@@ -764,7 +773,7 @@ function makeWsTransport(options, callback) {
 function makeUdpTransport(options, callback) {
   function onMessage(data, rinfo) {
     var msg = parseMessage(data);
-   
+
     if(msg && checkMessage(msg)) {
       if(msg.method) {
         msg.headers.via[0].params.received = rinfo.address;
@@ -779,20 +788,23 @@ function makeUdpTransport(options, callback) {
   var address = options.address || '0.0.0.0';
   var port = options.port || 5060;
 
-  var socket = dgram.createSocket(net.isIPv6(address) ? 'udp6' : 'udp4', onMessage); 
+  var socket = dgram.createSocket(net.isIPv6(address) ? 'udp6' : 'udp4', onMessage);
   socket.bind(port, address);
+  if(options.logger && options.logger.info) {
+    options.logger.info("Listening %s:%d/UDP ...", address, port);
+  }
 
   function open(remote, error) {
     return {
       send: function(m) {
         var s = stringify(m);
-        socket.send(new Buffer.from(s, 'binary'), 0, s.length, remote.port, remote.address);          
+        socket.send(new Buffer.from(s, 'binary'), 0, s.length, remote.port, remote.address);
       },
       protocol: 'UDP',
       release : function() {}
-    }; 
+    };
   };
-  
+
   return {
     open: open,
     get: open,
@@ -810,9 +822,9 @@ function makeTransport(options, callback) {
       callback(m, remote, stream);
     }
   }
-  
+
   if(options.udp === undefined || options.udp)
-    protocols.UDP = makeUdpTransport(options, callbackAndLog); 
+    protocols.UDP = makeUdpTransport(options, callbackAndLog);
   if(options.tcp === undefined || options.tcp)
     protocols.TCP = makeTcpTransport(options, callbackAndLog);
   if(options.tls)
@@ -853,7 +865,7 @@ function makeTransport(options, callback) {
         cn.release();
       }
     },
-    destroy: function() { 
+    destroy: function() {
       var protos = protocols;
       protocols = [];
       Object.keys(protos).forEach(function(key) { protos[key].destroy(); });
@@ -865,14 +877,14 @@ exports.makeTransport = makeTransport;
 
 function makeWellBehavingResolver(resolve) {
   var outstanding = Object.create(null);
-  
+
   return function(name, cb) {
     if(outstanding[name]) {
       outstanding[name].push(cb);
     }
     else {
       outstanding[name] = [cb];
-      
+
       resolve(name, function() {
         var o = outstanding[name];
         delete outstanding[name];
@@ -895,7 +907,7 @@ function resolve(uri, action) {
     var protocol = uri.params.transport || 'UDP';
     return action([{protocol: protocol, address: uri.host, port: uri.port || defaultPort(protocol)}]);
   }
-  
+
   function resolve46(host, cb) {
     resolve4(host, function(e4, a4) {
       resolve6(host, function(e6, a6) {
@@ -909,7 +921,7 @@ function resolve(uri, action) {
 
   if(uri.port) {
     var protocols = uri.params.transport ? [uri.params.transport] : ['UDP', 'TCP', 'TLS'];
-    
+
     resolve46(uri.host, function(err, address) {
       address = (address || []).map(function(x) { return protocols.map(function(p) { return { protocol: p, address: x, port: uri.port || defaultPort(p)};});})
         .reduce(function(arr,v) { return arr.concat(v); }, []);
@@ -918,20 +930,20 @@ function resolve(uri, action) {
   }
   else {
     var protocols = uri.params.transport ? [uri.params.transport] : ['tcp', 'udp', 'tls'];
-  
+
     var n = protocols.length;
     var addresses = [];
 
     protocols.forEach(function(proto) {
       resolveSrv('_sip._'+proto+'.'+uri.host, function(e, r) {
         --n;
-        
+
         if(Array.isArray(r)) {
           n += r.length;
           r.forEach(function(srv) {
             resolve46(srv.name, function(e, r) {
               addresses = addresses.concat((r||[]).map(function(a) { return {protocol: proto, address: a, port: srv.port};}));
-            
+
               if((--n)===0) // all outstanding requests has completed
                 action(addresses);
             });
@@ -971,14 +983,14 @@ function makeSM() {
     enter: function(newstate) {
       if(state && state.leave)
         state.leave();
-      
+
       state = newstate;
       Array.prototype.shift.apply(arguments);
-      if(state.enter) 
+      if(state.enter)
         state.enter.apply(this, arguments);
     },
     signal: function(s) {
-      if(state && state[s]) 
+      if(state && state[s])
         state[Array.prototype.shift.apply(arguments)].apply(state, arguments);
     }
   };
@@ -987,9 +999,9 @@ function makeSM() {
 function createInviteServerTransaction(transport, cleanup) {
   var sm = makeSM();
   var rs;
-    
+
   var proceeding = {
-    message: function() { 
+    message: function() {
       if(rs) transport(rs);
     },
     send: function(message) {
@@ -999,7 +1011,7 @@ function createInviteServerTransaction(transport, cleanup) {
         sm.enter(completed);
       else if(message.status >= 200)
         sm.enter(accepted);
-      
+
       transport(rs);
     }
   }
@@ -1007,7 +1019,7 @@ function createInviteServerTransaction(transport, cleanup) {
   var g, h;
   var completed = {
     enter: function () {
-      g = setTimeout(function retry(t) { 
+      g = setTimeout(function retry(t) {
         g = setTimeout(retry, t*2, t*2);
         transport(rs)
       }, 500, 500);
@@ -1024,8 +1036,8 @@ function createInviteServerTransaction(transport, cleanup) {
         transport(rs);
     }
   }
- 
-  var timer_i; 
+
+  var timer_i;
   var confirmed = {
     enter: function() { timer_i = setTimeout(sm.enter.bind(sm, terminated), 5000);},
     leave: function() { clearTimeout(timer_i); }
@@ -1035,14 +1047,14 @@ function createInviteServerTransaction(transport, cleanup) {
   var accepted = {
     enter: function() { l = setTimeout(sm.enter.bind(sm, terminated), 32000);},
     leave: function() { clearTimeout(l); },
-    send: function(m) { 
+    send: function(m) {
       rs = m;
       transport(rs);
-    }  
+    }
   };
 
   var terminated = {enter: cleanup};
-  
+
   sm.enter(proceeding);
 
   return {send: sm.signal.bind(sm, 'send'), message: sm.signal.bind(sm,'message'), shutdown: function() { sm.enter(terminated); }};
@@ -1059,7 +1071,7 @@ function createServerTransaction(transport, cleanup) {
       transport(m);
       if(m.status >= 200) sm.enter(completed);
     }
-  }; 
+  };
 
   var j;
   var completed = {
@@ -1089,7 +1101,7 @@ function createInviteClientTransaction(rq, transport, tu, cleanup, options) {
           a = setTimeout(resend, t*2, t*2);
         }, 500, 500);
       }
-        
+
       b = setTimeout(function() {
         tu(makeResponse(rq, 408));
         sm.enter(terminated);
@@ -1104,7 +1116,7 @@ function createInviteClientTransaction(rq, transport, tu, cleanup, options) {
 
       if(message.status < 200)
         sm.enter(proceeding);
-      else if(message.status < 300) 
+      else if(message.status < 300)
          sm.enter(accepted);
       else
         sm.enter(completed, message);
@@ -1114,7 +1126,7 @@ function createInviteClientTransaction(rq, transport, tu, cleanup, options) {
   var proceeding = {
     message: function(message) {
       tu(message);
-      
+
       if(message.status >= 300)
         sm.enter(completed, message);
       else if(message.status >= 200)
@@ -1130,7 +1142,7 @@ function createInviteClientTransaction(rq, transport, tu, cleanup, options) {
       cseq: {method: 'ACK', seq: rq.headers.cseq.seq},
       'call-id': rq.headers['call-id'],
       via: [rq.headers.via[0]],
-      'max-forwards': (options && options['max-forwards']) || 70 
+      'max-forwards': (options && options['max-forwards']) || 70
     }
   };
 
@@ -1160,20 +1172,20 @@ function createInviteClientTransaction(rq, transport, tu, cleanup, options) {
   };
 
   var terminated = {enter: cleanup};
- 
+
   process.nextTick(function(){ sm.enter(calling); });
- 
+
   return {message: sm.signal.bind(sm, 'message'), shutdown: function() { sm.enter(terminated); }};
 }
 
-function createClientTransaction(rq, transport, tu, cleanup) {  
+function createClientTransaction(rq, transport, tu, cleanup) {
   assert.ok(rq.method !== 'INVITE');
 
   var sm = makeSM();
-  
+
   var e, f;
   var trying = {
-    enter: function() { 
+    enter: function() {
       transport(rq);
       if(!transport.reliable)
         e = setTimeout(function() { sm.signal('timerE', 500); }, 500);
@@ -1234,30 +1246,30 @@ function makeTransactionLayer(options, transport) {
   return {
     createServerTransaction: function(rq, cn) {
       var id = makeTransactionId(rq);
-      
+
       return server_transactions[id] = (rq.method === 'INVITE' ? createInviteServerTransaction : createServerTransaction)(
         cn.send.bind(cn),
-        function() { 
+        function() {
           delete server_transactions[id];
           cn.release();
         });
     },
     createClientTransaction: function(connection, rq, callback) {
       if(rq.method !== 'CANCEL') rq.headers.via[0].params.branch = generateBranch();
-      
-      
+
+
       if(typeof rq.headers.cseq !== 'object')
         rq.headers.cseq = parseCSeq({s: rq.headers.cseq, i:0});
 
       var send = connection.send.bind(connection);
       send.reliable = connection.protocol.toUpperCase() !== 'UDP';
-      
+
       var id = makeTransactionId(rq);
-      return client_transactions[id] = 
-        (rq.method === 'INVITE' ? createInviteClientTransaction : createClientTransaction)(rq, send, callback, function() { 
+      return client_transactions[id] =
+        (rq.method === 'INVITE' ? createInviteClientTransaction : createClientTransaction)(rq, send, callback, function() {
           delete client_transactions[id];
           connection.release();
-        }, 
+        },
         options);
     },
     getServer: function(m) {
@@ -1285,7 +1297,7 @@ function sequentialSearch(transaction, connect, addresses, rq, callback) {
   var lastStatusCode;
   function next() {
     onresponse = searching;
-    
+
     if(addresses.length > 0) {
       try {
         var address = addresses.shift();
@@ -1294,10 +1306,10 @@ function sequentialSearch(transaction, connect, addresses, rq, callback) {
             console.log("err: ", err);
           }
           client.message(makeResponse(rq, 503));
-        }), rq, function() { onresponse.apply(null, arguments); }); 
+        }), rq, function() { onresponse.apply(null, arguments); });
       }
       catch(e) {
-        onresponse(address.local ? makeResponse(rq, 430) : makeResponse(rq, 503));  
+        onresponse(address.local ? makeResponse(rq, 430) : makeResponse(rq, 503));
       }
     }
     else {
@@ -1312,10 +1324,10 @@ function sequentialSearch(transaction, connect, addresses, rq, callback) {
       return next();
     else if(rs.status > 100)
       onresponse = callback;
-    
+
     callback(rs);
   }
- 
+
   next();
 }
 
@@ -1334,7 +1346,7 @@ exports.create = function(options, callback) {
           } catch(e) {
             t.send(makeResponse(m, '500', 'Internal Server Error'));
             throw e;
-          } 
+          }
         }
         else if(m.method === 'ACK') {
           callback(m,remote);
@@ -1343,12 +1355,12 @@ exports.create = function(options, callback) {
       else {
         t.message && t.message(m, remote);
       }
-    } 
+    }
     catch(e) {
       errorLog(e);
     }
   });
-  
+
   var transaction = makeTransactionLayer(options, transport.open.bind(transport));
   var hostname = options.publicAddress || options.address || options.hostname || os.hostname();
   var port = options.port || 5060;
@@ -1368,8 +1380,8 @@ exports.create = function(options, callback) {
     var flow = {protocol: s[1], address: s[2], port: +s[3], local: {address: s[4], port: +s[5]}};
 
     return encodeFlowToken(flow) == token ? flow : undefined;
-  }       
-  
+  }
+
   return {
     send: function(m, callback) {
       if(m.method === undefined) {
@@ -1392,7 +1404,7 @@ exports.create = function(options, callback) {
           hop = parseUri(m.headers.route[0].uri);
           if(hop.host === hostname && hop.port === port) {
             m.headers.route.shift();
-          } 
+          }
           else if(hop.params.lr === undefined ) {
             m.headers.route.shift();
             m.headers.route.push({uri: m.uri});
@@ -1414,7 +1426,7 @@ exports.create = function(options, callback) {
 
             if(m.headers.via.length === 0)
               m.headers.via.unshift({params: {branch: generateBranch()}});
-            
+
             if(addresses.length === 0) {
               errorLog(new Error("ACK: couldn't resolve " + stringifyUri(m.uri)));
               return;
@@ -1423,7 +1435,7 @@ exports.create = function(options, callback) {
             var cn = transport.open(addresses[0], errorLog);
             try {
               cn.send(m);
-            } 
+            }
             catch(e) {
               errorLog(e);
             }
@@ -1432,7 +1444,7 @@ exports.create = function(options, callback) {
             }
           }
           else
-            sequentialSearch(transaction.createClientTransaction.bind(transaction), transport.open.bind(transport), addresses, m, callback || function() {}); 
+            sequentialSearch(transaction.createClientTransaction.bind(transaction), transport.open.bind(transport), addresses, m, callback || function() {});
         });
       }
     },
@@ -1451,7 +1463,7 @@ exports.create = function(options, callback) {
       transaction.destroy();
       transport.destroy();
     }
-  } 
+  }
 }
 
 exports.start = function(options, callback) {

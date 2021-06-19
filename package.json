@@ -24,6 +24,16 @@
     "ws": "^7.4.6"
   },
   "devDependencies": {
+    "@types/node": "^15.12.2",
+    "ts-node": "^10.0.0",
+    "typescript": "^4.3.2",
+    "xml2js": "^0.4.23",
+    "xml-js": "^1.6.11",
+    "jssip": "^3.7.9",
+    "json": "^11.0.0",
+    "log4js": "^6.3.0",
+    "log4js-extend": "^0.2.1",
     "coffee-script": "~1.6.2"
-  }
+  },
+  "types": "./types/sip.d.ts"
 }

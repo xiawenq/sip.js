@@ -113,6 +113,7 @@ exports.challenge = function(ctx, rs) {
   ctx.nc = 0;
   ctx.qop = ctx.qop || 'auth,auth-int';
   ctx.algorithm = ctx.algorithm || 'md5';
+  ctx.opaque = ctx.opaque || rbytes();
 
 
   var hname = ctx.proxy ? 'proxy-authenticate' : 'www-authenticate';
