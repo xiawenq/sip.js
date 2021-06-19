@@ -1,5 +1,5 @@
-var sip = require('sip');
-var proxy = require('sip/proxy');
+var sip = require('../sip');
+var proxy = require('../proxy');
 var util = require('util');
 var crypto = require('crypto');
 
@@ -14,7 +14,7 @@ function contacts(user) {
 function onRegister(rq, flow) {
   var user = sip.parseUri(rq.headers.to.uri).user;
   if(rq.headers.contact === '*')
-    delete bindings[user];  
+    delete bindings[user];
   else {
     var record = bindings[user];
     if(!record) record = bindings[user] = {};
@@ -22,7 +22,7 @@ function onRegister(rq, flow) {
     rq.headers.contact.forEach(function(x) {
       var ob = !!(x.params['reg-id'] && x.params['+sip.instance']);
       var key = ob ? [x.params['+sip.instance'],x.params['reg-id']].join() : rq.headers['call-id'];
-    
+
       if(!record[key] || record[key].seq < rq.headers.cseq.seq) {
         var binding = {
           contact: x,
@@ -42,7 +42,7 @@ function onRegister(rq, flow) {
   }
 
   if(!rq.headers.to.params.tag) rq.headers.to.params.tag = crypto.randomBytes(8).toString('hex');
- 
+
   var c = contacts(user);
   if(c.length) {
     proxy.send(sip.makeResponse(rq, 200, 'OK', {headers: {
@@ -89,6 +89,7 @@ proxy.start({
     recv: function(m) { console.log('recv', util.inspect(m,{depth: null})); },
     error: function(e) { console.log(e, e.stack) }
   },
+  port: 1222,
   hostname: process.argv[2],
   ws_port: (+process.argv[3]) || 8506
 },

@@ -1,11 +1,11 @@
-// Somewhat practical example. 
+// Somewhat practical example.
 // Some time ago i had to connect an softpbx to a service provider. Service provider used some kind of load balancer that
 // responded with '302 Moved Temporarily' to every INVITE. However pbx didn't understand '302' response and was simply dropping
-// outbound calls. So i wrote this script, which restarts all requests responded with '302 Moved', installed it on the 
+// outbound calls. So i wrote this script, which restarts all requests responded with '302 Moved', installed it on the
 // same host and set it as outbound proxy for the pbx.
 
-var sip = require('sip');
-var proxy = require('sip/proxy');
+var sip = require('../sip');
+var proxy = require('../proxy');
 var util = require('util');
 
 proxy.start(
@@ -15,7 +15,7 @@ proxy.start(
     send: function(m) { util.debug("send " + util.inspect(m, false, null)); },
     recv: function(m) { util.debug("recv " + util.inspect(m, false, null)); }
   }
-}, 
+},
 function(rq) {
   try {
     var move_count = 0;
@@ -31,14 +31,14 @@ function(rq) {
       }
       else {
         // forwarding non-302 response
-       
+
         // removing top via
         rs.headers.via.shift();
 
         proxy.send(rs);
       }
     });
-  } 
+  }
   catch(e) {
     util.debug(e.stack);
   }

@@ -1,6 +1,6 @@
 // Initiating a call example. Note: we use bogus sdp, so no real rtp session will be established.
 
-var sip = require('sip');
+var sip = require('../sip');
 var util = require('util');
 var os = require('os');
 
@@ -18,7 +18,7 @@ function rstring() { return Math.floor(Math.random()*1e6).toString(); }
 sip.start({}, function(rq) {
   if(rq.headers.to.params.tag) { // check if it's an in dialog request
     var id = [rq.headers['call-id'], rq.headers.to.params.tag, rq.headers.from.params.tag].join(':');
-    
+
     if(dialogs[id])
       dialogs[id](rq);
     else
@@ -58,7 +58,7 @@ sip.send({
 },
 function(rs) {
   if(rs.status >= 300) {
-    console.log('call failed with status ' + rs.status);  
+    console.log('call failed with status ' + rs.status);
   }
   else if(rs.status < 200) {
     console.log('call progress status ' + rs.status);
@@ -66,7 +66,7 @@ function(rs) {
   else {
     // yes we can get multiple 2xx response with different tags
     console.log('call answered with tag ' + rs.headers.to.params.tag);
-    
+
     // sending ACK
     sip.send({
       method: 'ACK',

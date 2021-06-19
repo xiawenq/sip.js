@@ -1,4 +1,4 @@
-var sip=require('sip');
+var sip=require('./sip');
 var util=require('util');
 
 var contexts = {};
@@ -21,7 +21,7 @@ exports.send = function(msg, callback) {
     sip.send.apply(sip, arguments);
     return;
   }
- 
+
   return msg.method ? forwardRequest(ctx, msg, callback || defaultCallback) : forwardResponse(ctx, msg);
 };
 
@@ -90,7 +90,7 @@ exports.start = function(options, route) {
 
       if(ctx) {
         sip.send(sip.makeResponse(rq, 200));
-       
+
         ctx.cancelled = true;
         if(ctx.cancellers) {
           Object.keys(ctx.cancellers).forEach(function(c) { ctx.cancellers[c](); });
