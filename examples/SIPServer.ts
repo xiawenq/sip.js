@@ -15,11 +15,8 @@ log4js_extend(log4js, {
   path: __dirname + "/a.log",
   format: "at @name (@file:@line:@column)"
 });
-import sip = require("sip");
-import digest = require("sip/digest");
-// import os = require("os");
-// import xml2js = require("xml2js");
-const parseString = require('xml2js').parseString;
+import sip = require("../sip");
+import digest = require("../digest");
 import Convert = require("xml-js");
 
 
@@ -39,7 +36,7 @@ sip.start(
   {
     logger: {
       send: function(message, address) {
-        // logger.info("==send==:" , message,address);
+        logger.info("==send==:" , message,address);
       },
       recv: function(message, address) {
         // logger.info("==recv==:" , message,address);
@@ -109,27 +106,26 @@ sip.start(
       }
       else if (message.method.toUpperCase() == 'MESSAGE') {
         logger.info(message.method);
-        const js = Convert.xml2js(message.content);
-        logger.info(js.declaration);
-        logger.info(js.elements);
-        for (let el of js.elements) {
-          if (el.name.toLowerCase() === 'notify') {
-            for (let i of el.elements) {
-              if (i.name.toLowerCase() === 'cmdtype') {
-                if (i.elements[0].text.toString().toLowerCase() === 'keepalive')
-                  sip.send(sip.makeResponse(message, 200, 'ok'));
-              }
-            }
-          }
-        }
-
-        ///////////////// to json不需要
-        // const rawjs = Convert.xml2json(message.content, {compact: true, spaces: 2});
-        // const cjs = JSON.parse(rawjs);
-        // logger.info(cjs);
-        // if (cjs.hasOwnProperty("Notify")) {
-        //   logger.info(js.name)
+        // const js = Convert.xml2js(message.content);
+        // logger.info(js.declaration);
+        // logger.info(js.elements);
+        // for (let el of js.elements) {
+        //   if (el.name.toLowerCase() === 'notify') {
+        //     for (let i of el.elements) {
+        //       if (i.name.toLowerCase() === 'cmdtype') {
+        //         if (i.elements[0].text.toString().toLowerCase() === 'keepalive')
+        //           sip.send(sip.makeResponse(message, 200, 'ok'));
+        //       }
+        //     }
+        //   }
         // }
+        const jsc = Convert.xml2js(message.content, {compact: true});
+        if (jsc['Query'] && jsc['Query']['CmdType'] && jsc['Query']['CmdType']._text === 'RecordInfo') {
+          sip.send(sip.makeResponse(message, 200, 'ok'));
+        }
+        else if (jsc['Notify'] && jsc['Notify']['CmdType'] && jsc['Notify']['CmdType']._text === 'Keepalive') {
+          sip.send(sip.makeResponse(message, 200, 'ok'));
+        }
       }
 
     } catch(e) {

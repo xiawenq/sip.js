@@ -1,25 +1,44 @@
 var crypto = require('crypto');
 var util = require('util');
-var stringifyUri = require('./sip').stringifyUri; 
+var stringifyUri = require('./sip').stringifyUri;
 
+/**
+ *
+ * @param a
+ * @returns {string|*}
+ */
 function unq(a) {
   if(a && a[0] === '"' && a[a.length-1] === '"')
     return a.substr(1, a.length - 2);
   return a;
 }
 
+/**
+ *
+ * @param a
+ * @returns {string|*}
+ */
 function q(a) {
   if(typeof a === 'string' && a[0] !== '"')
     return ['"', a, '"'].join('');
   return a;
 }
 
+/**
+ *
+ * @param a
+ * @returns {string|*}
+ */
 function lowercase(a) {
   if(typeof a === 'string')
     return a.toLowerCase();
   return a;
 }
 
+/**
+ *
+ * @returns {string}
+ */
 function kd() {
   var hash = crypto.createHash('md5');
 
@@ -30,23 +49,44 @@ function kd() {
 }
 exports.kd = kd;
 
+/**
+ *
+ * @returns {string}
+ */
 function rbytes() {
   return kd(Math.random().toString(), Math.random().toString());
 }
 
+/**
+ *
+ * @param user
+ * @param realm
+ * @param password
+ * @returns {string}
+ */
 function calculateUserRealmPasswordHash(user, realm, password) {
   return kd(unq(user), unq(realm), unq(password));
 }
 exports.calculateUserRealmPasswordHash = calculateUserRealmPasswordHash;
 
+/**
+ *
+ * @param ctx
+ * @returns {string|*}
+ */
 function calculateHA1(ctx) {
   var userhash = ctx.userhash || calculateUserRealmPasswordHash(ctx.user, ctx.realm, ctx.password);
   if(ctx.algorithm === 'md5-sess') return kd(userhash, ctx.nonce, ctx.cnonce);
 
-  return userhash; 
+  return userhash;
 }
 exports.calculateHA1 = calculateHA1;
 
+/**
+ *
+ * @param ctx
+ * @returns {string}
+ */
 function calculateDigest(ctx) {
   switch(ctx.qop) {
   case 'auth-int':
@@ -60,12 +100,25 @@ function calculateDigest(ctx) {
 exports.calculateDigest = calculateDigest;
 
 var nonceSalt = rbytes();
+
+/**
+ *
+ * @param tag
+ * @param timestamp
+ * @returns {string}
+ */
 function generateNonce(tag, timestamp) {
   var ts = (timestamp || new Date()).toISOString();
   return new Buffer.from([ts, kd(ts, tag, nonceSalt)].join(';'), 'ascii').toString('base64');
 }
 exports.generateNonce = generateNonce;
 
+/**
+ *
+ * @param nonce
+ * @param tag
+ * @returns {boolean|Date}
+ */
 function extractNonceTimestamp(nonce, tag) {
   var v = new Buffer.from(nonce, 'base64').toString('ascii').split(';');
   if(v.length != 2)
@@ -77,16 +130,36 @@ function extractNonceTimestamp(nonce, tag) {
 }
 exports.extractNonceTimestamp = extractNonceTimestamp;
 
+/**
+ *
+ * @param n
+ * @returns {string}
+ */
 function numberTo8Hex(n) {
   n = n.toString(16);
   return '00000000'.substr(n.length) + n;
 }
 
+/**
+ *
+ * @param headers
+ * @param realm
+ * @returns {*}
+ */
 function findDigestRealm(headers, realm) {
-  if(!realm) return headers && headers[0];
-  return headers && headers.filter(function(x) { return x.scheme.toLowerCase() === 'digest' && unq(x.realm) === realm; })[0];
+  if(!realm)
+    return headers && headers[0];
+  return headers && headers.filter(function(x) {
+    return x.scheme.toLowerCase() === 'digest' && unq(x.realm) === realm;
+  })[0];
 }
 
+/**
+ *
+ * @param challenge
+ * @param preference
+ * @returns {string}
+ */
 function selectQop(challenge, preference) {
   if(!challenge)
     return;
@@ -95,7 +168,7 @@ function selectQop(challenge, preference) {
   if(!preference)
     return challenge[0];
 
-  if(typeof(preference) === 'string') 
+  if(typeof(preference) === 'string')
     preference = preference.split(',');
 
   for(var i = 0; i !== preference.length; ++i)
@@ -106,6 +179,12 @@ function selectQop(challenge, preference) {
   throw new Error('failed to negotiate protection quality');
 }
 
+/**
+ *
+ * @param ctx
+ * @param rs
+ * @returns {*}
+ */
 exports.challenge = function(ctx, rs) {
   ctx.proxy = rs.status === 407;
 
@@ -130,7 +209,13 @@ exports.challenge = function(ctx, rs) {
 
   return rs;
 }
-
+/**
+ *
+ * @param ctx
+ * @param rq
+ * @param creds
+ * @returns {boolean}
+ */
 exports.authenticateRequest = function(ctx, rq, creds) {
   var response = findDigestRealm(rq.headers[ctx.proxy ? 'proxy-authorization': 'authorization'], ctx.realm);
 
@@ -141,14 +226,14 @@ exports.authenticateRequest = function(ctx, rq, creds) {
   var qop = unq(lowercase(response.qop));
 
   ctx.nc = (ctx.nc || 0) +1;
-  
+
   if(!ctx.ha1) {
     ctx.userhash = creds.hash || calculateUserRealmPasswordHash(creds.user, ctx.realm, creds.password);
     ctx.ha1 = ctx.userhash;
     if(ctx.algorithm === 'md5-sess')
       ctx.ha1 = kd(ctx.userhash, ctx.nonce, cnonce);
   }
-  
+
   var digest = calculateDigest({ha1:ctx.ha1, method:rq.method, nonce:ctx.nonce, nc:numberTo8Hex(ctx.nc), cnonce:cnonce, qop:qop, uri:uri, entity:rq.content});
   if(digest === unq(response.response)) {
     ctx.cnonce = cnonce;
@@ -156,11 +241,16 @@ exports.authenticateRequest = function(ctx, rq, creds) {
     ctx.qop = qop;
 
     return true;
-  } 
+  }
 
   return false;
 }
-
+/**
+ *
+ * @param ctx
+ * @param rs
+ * @returns {*}
+ */
 exports.signResponse = function(ctx, rs) {
   var nc = numberTo8Hex(ctx.nc);
   rs.headers['authentication-info'] = {
@@ -172,6 +262,12 @@ exports.signResponse = function(ctx, rs) {
   return rs;
 }
 
+/**
+ *
+ * @param ctx
+ * @param rs
+ * @param creds
+ */
 function initClientContext(ctx, rs, creds) {
   var challenge;
 
@@ -181,13 +277,13 @@ function initClientContext(ctx, rs, creds) {
   }
   else
     challenge = findDigestRealm(rs.headers['www-authenticate'], creds.realm);
-  
+
   if(ctx.nonce !== unq(challenge.nonce)) {
     ctx.nonce = unq(challenge.nonce);
 
     ctx.algorithm = unq(lowercase(challenge.algorithm));
     ctx.qop = selectQop(lowercase(challenge.qop), ctx.qop);
- 
+
     if(ctx.qop) {
       ctx.nc = 0;
       ctx.cnonce = rbytes();
@@ -207,6 +303,14 @@ function initClientContext(ctx, rs, creds) {
   ctx.opaque = unq(challenge.opaque);
 }
 
+/**
+ *
+ * @param ctx
+ * @param rq
+ * @param rs
+ * @param creds
+ * @returns {{qop}|null}
+ */
 exports.signRequest = function (ctx, rq, rs, creds) {
   ctx = ctx || {};
   if(rs)
@@ -215,29 +319,35 @@ exports.signRequest = function (ctx, rq, rs, creds) {
   var nc = ctx.nc !== undefined ? numberTo8Hex(++ctx.nc) : undefined;
 
   ctx.uri = stringifyUri(rq.uri);
-  
+
   var signature = {
     scheme: 'Digest',
     realm: q(ctx.realm),
     username: q(ctx.user),
-    nonce: q(ctx.nonce), 
+    nonce: q(ctx.nonce),
     uri: q(ctx.uri),
     nc: nc,
     algorithm: ctx.algorithm,
     cnonce: q(ctx.cnonce),
     qop: ctx.qop,
     opaque: q(ctx.opaque),
-    response: q(calculateDigest({ha1:ctx.ha1, method:rq.method, nonce:ctx.nonce, nc:nc, cnonce:ctx.cnonce, qop:ctx.qop, uri:ctx.uri, entity:rq.content}))    
+    response: q(calculateDigest({ha1:ctx.ha1, method:rq.method, nonce:ctx.nonce, nc:nc, cnonce:ctx.cnonce, qop:ctx.qop, uri:ctx.uri, entity:rq.content}))
   };
 
-  var hname = ctx.proxy ? 'proxy-authorization' : 'authorization'; 
- 
-  rq.headers[hname] = (rq.headers[hname] || []).filter(function(x) { return unq(x.realm) !== ctx.realm; });
+  var hname = ctx.proxy ? 'proxy-authorization' : 'authorization';
+
+  rq.headers[hname] = (rq.headers[hname] || []).filter(function(x) {
+    return unq(x.realm) !== ctx.realm; });
   rq.headers[hname].push(signature);
 
   return ctx.qop ? ctx : null;
 }
-
+/**
+ *
+ * @param ctx
+ * @param rs
+ * @returns {boolean|undefined}
+ */
 exports.authenticateResponse = function(ctx, rs) {
   var signature = rs.headers[ctx.proxy ? 'proxy-authentication-info' : 'authentication-info'];
 
@@ -250,13 +360,13 @@ exports.authenticateResponse = function(ctx, rs) {
       ctx.nonce = nextnonce;
       ctx.nc = 0;
 
-      if(ctx.algorithm === 'md5-sess') 
+      if(ctx.algorithm === 'md5-sess')
         ctx.ha1 = kd(ctx.userhash, ctx.nonce, ctx.cnonce);
     }
 
     return true;
   }
- 
+
   return false;
 }
 

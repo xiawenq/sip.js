@@ -1,6 +1,15 @@
 var util = require('util');
 
+/**
+ *
+ * @type {{a: (function(*): *), c: (function(*): {address: *, nettype: *, addrtype: *}), m: (function(*=): {port, portnum, proto: string, media: string, fmt: *[]}), o: (function(*): {address: *, nettype: *, addrtype: *, id: *, version: *, username: *})}}
+ */
 var parsers = {
+  /**
+   *
+   * @param o
+   * @returns {{address, nettype, addrtype, id, version, username}}
+   */
   o: function(o) {
     var t = o.split(/\s+/);
     return {
@@ -12,10 +21,20 @@ var parsers = {
       address : t[5]
     };
   },
+  /**
+   *
+   * @param c
+   * @returns {{address, nettype, addrtype}}
+   */
   c: function(c) {
     var t = c.split(/\s+/);
     return { nettype: t[0], addrtype: t[1], address: t[2] };
   },
+  /**
+   *
+   * @param m
+   * @returns {{port: number, portnum: number, proto: string, media: string, fmt: number[]}}
+   */
   m: function(m) {
     var t = /^(\w+) +(\d+)(?:\/(\d))? +(\S+) (\d+( +\d+)*)/.exec(m);
 
@@ -27,21 +46,31 @@ var parsers = {
       fmt: t[5].split(/\s+/).map(function(x) { return +x; })
     };
   },
+  /**
+   *
+   * @param a
+   * @returns {*}
+   */
   a: function(a) {
     return a;
   }
 };
 
+/**
+ *
+ * @param sdp
+ * @returns {{}}
+ */
 exports.parse = function(sdp) {
   var sdp = sdp.split(/\r\n/);
-  
+
   var root = {};
   var m;
   root.m = [];
 
   for(var i = 0; i < sdp.length; ++i) {
     var tmp = /^(\w)=(.*)/.exec(sdp[i]);
-    
+
     if(tmp) {
 
     var c = (parsers[tmp[1]] || function(x) { return x;})(tmp[2]);
@@ -63,22 +92,48 @@ exports.parse = function(sdp) {
   }
 
   if(m) root.m.push(m);
-  
+
   return root;
 };
 
+/**
+ *
+ * @type {{c: (function(*): string), m: (function(*): string), o: (function(*): string)}}
+ */
 var stringifiers = {
+  /**
+   *
+   * @param o
+   * @returns {string}
+   */
   o: function(o) {
-    return [o.username || '-', o.id, o.version, o.nettype || 'IN', o.addrtype || 'IP4', o.address].join(' '); 
+    return [o.username || '-', o.id, o.version, o.nettype || 'IN', o.addrtype || 'IP4', o.address].join(' ');
   },
+  /**
+   *
+   * @param c
+   * @returns {string}
+   */
   c: function(c) {
     return [c.nettype || 'IN', c.addrtype || 'IP4', c.address].join(' ');
   },
+  /**
+   *
+   * @param m
+   * @returns {string}
+   */
   m: function(m) {
     return [m.media || 'audio', m.port, m.proto || 'RTP/AVP', m.fmt.join(' ')].join(' ');
   }
 };
 
+/**
+ *
+ * @param sdp
+ * @param type
+ * @param def
+ * @returns {string|*}
+ */
 function stringifyParam(sdp, type, def) {
   if(sdp[type] !== undefined) {
     var stringifier = function(x) { return type + '=' + ((stringifiers[type] && stringifiers[type](x)) || x) + '\r\n'; };
@@ -94,9 +149,14 @@ function stringifyParam(sdp, type, def) {
   return '';
 }
 
+/**
+ *
+ * @param sdp
+ * @returns {string}
+ */
 exports.stringify = function(sdp) {
   var s = '';
-  
+
   s += stringifyParam(sdp, 'v', 0);
   s +=  stringifyParam(sdp, 'o');
   s +=  stringifyParam(sdp, 's', '-');

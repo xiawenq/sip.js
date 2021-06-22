@@ -8,6 +8,10 @@ var os = require('os');
 var crypto = require('crypto');
 var WebSocket = require('ws');
 
+/**
+ *
+ * @param e
+ */
 function debug(e) {
   if(e.stack) {
     util.debug(e + '\n' + e.stack);
@@ -16,6 +20,11 @@ function debug(e) {
     util.debug(util.inspect(e));
 }
 
+/**
+ *
+ * @param s
+ * @returns {string}
+ */
 function toBase64(s) {
   switch(s.length % 3) {
   case 1:
@@ -30,7 +39,12 @@ function toBase64(s) {
   return (new Buffer.from(s)).toString('base64').replace(/\//g, '_').replace(/\+/g, '-');
 }
 // Actual stack code begins here
-
+/**
+ *
+ * @param rs
+ * @param m
+ * @returns {*}
+ */
 function parseResponse(rs, m) {
   var r = rs.match(/^SIP\/(\d+\.\d+)\s+(\d+)\s*(.*)\s*$/);
 
@@ -43,6 +57,12 @@ function parseResponse(rs, m) {
   }
 }
 
+/**
+ *
+ * @param rq
+ * @param m
+ * @returns {*}
+ */
 function parseRequest(rq, m) {
   var r = rq.match(/^([\w\-.!%*_+`'~]+)\s([^\s]+)\sSIP\s*\/\s*(\d+\.\d+)/);
 
@@ -55,6 +75,12 @@ function parseRequest(rq, m) {
   }
 }
 
+/**
+ *
+ * @param regex
+ * @param data
+ * @returns {*}
+ */
 function applyRegex(regex, data) {
   regex.lastIndex = data.i;
   var r = regex.exec(data.s);
@@ -65,6 +91,12 @@ function applyRegex(regex, data) {
   }
 }
 
+/**
+ *
+ * @param data
+ * @param hdr
+ * @returns {{params}|*}
+ */
 function parseParams(data, hdr) {
   hdr.params = hdr.params || {};
 
@@ -77,6 +109,13 @@ function parseParams(data, hdr) {
   return hdr;
 }
 
+/**
+ *
+ * @param parser
+ * @param d
+ * @param h
+ * @returns []
+ */
 function parseMultiHeader(parser, d, h) {
   h = h || [];
 
@@ -88,10 +127,21 @@ function parseMultiHeader(parser, d, h) {
   return h;
 }
 
+/**
+ *
+ * @param d
+ * @param h
+ * @returns {string|string|*}
+ */
 function parseGenericHeader(d, h) {
   return h ? h + ',' + d.s : d.s;
 }
 
+/**
+ *
+ * @param data
+ * @returns {*}
+ */
 function parseAOR(data) {
   var r = applyRegex(/((?:[\w\-.!%*_+`'~]+)(?:\s+[\w\-.!%*_+`'~]+)*|"[^"\\]*(?:\\.[^"\\]*)*")?\s*\<\s*([^>]*)\s*\>|((?:[^\s@"<]@)?[^\s;]+)/g, data);
 
@@ -99,22 +149,42 @@ function parseAOR(data) {
 }
 exports.parseAOR = parseAOR;
 
+/**
+ *
+ * @param data
+ * @returns {*}
+ */
 function parseAorWithUri(data) {
   var r = parseAOR(data);
   r.uri = parseUri(r.uri);
   return r;
 }
 
+/**
+ *
+ * @param data
+ * @returns {*}
+ */
 function parseVia(data) {
   var r = applyRegex(/SIP\s*\/\s*(\d+\.\d+)\s*\/\s*([\S]+)\s+([^\s;:]+)(?:\s*:\s*(\d+))?/g, data);
   return parseParams(data, {version: r[1], protocol: r[2], host: r[3], port: r[4] && +r[4]});
 }
 
+/**
+ * 解析CSQ头
+ * @param d
+ * @returns {{method: string, seq: number}}
+ */
 function parseCSeq(d) {
   var r = /(\d+)\s*([\S]+)/.exec(d.s);
   return { seq: +r[1], method: unescape(r[2]) };
 }
 
+/**
+ *
+ * @param d
+ * @returns {{scheme}}
+ */
 function parseAuthHeader(d) {
   var r1 = applyRegex(/([^\s]*)\s+/g, d);
   var a = {scheme: r1[1]};
@@ -129,6 +199,11 @@ function parseAuthHeader(d) {
   return a;
 }
 
+/**
+ *
+ * @param d
+ * @returns {{}}
+ */
 function parseAuthenticationInfoHeader(d) {
   var a = {};
   var r = applyRegex(/([^\s,"=]*)\s*=\s*([^\s,"]+|"[^"\\]*(?:\\.[^"\\]*)*")\s*/g, d);
@@ -153,6 +228,10 @@ var compactForm = {
   v: 'via'
 };
 
+/**
+ *
+ * @type {{"content-length": (function(*): number), "authentication-info": (function(*=): {}), "refer-to": (function(*=): {params}|*), "www-authenticate": any, "record-route": any, via: any, authorization: any, path: any, cseq: (function(*): {method: string, seq}), route: any, contact: ((function(*=, *=): (*))|*), "proxy-authenticate": any, from: (function(*=): {params}|*), to: (function(*=): {params}|*), "proxy-authorization": any}}
+ */
 var parsers = {
   'to': parseAOR,
   'from': parseAOR,
@@ -176,6 +255,11 @@ var parsers = {
   'refer-to': parseAOR
 };
 
+/**
+ *
+ * @param data
+ * @returns {{}}
+ */
 function parse(data) {
   data = data.split(/\r\n(?![ \t])/);
 
@@ -207,6 +291,11 @@ function parse(data) {
   return m;
 }
 
+/**
+ *
+ * @param s
+ * @returns {{schema: string, headers: T, password: string, port: number, host: string, params: T, user: string}|*}
+ */
 function parseUri(s) {
   if(typeof s === 'object')
     return s;
@@ -234,10 +323,20 @@ function parseUri(s) {
 
 exports.parseUri = parseUri;
 
+/**
+ * 校验版本号是否存在，否在返回默认版本号 2.0
+ * @param v
+ * @returns {string}
+ */
 function stringifyVersion(v) {
   return v || '2.0';
 }
 
+/**
+ *
+ * @param params
+ * @returns {string}
+ */
 function stringifyParams(params) {
   var s = '';
   for(var n in params) {
@@ -247,6 +346,11 @@ function stringifyParams(params) {
   return s;
 }
 
+/**
+ * 校验URI
+ * @param uri
+ * @returns {string}
+ */
 function stringifyUri(uri) {
   if(typeof uri === 'string')
     return uri;
@@ -278,10 +382,20 @@ function stringifyUri(uri) {
 
 exports.stringifyUri = stringifyUri;
 
+/**
+ *
+ * @param aor
+ * @returns {string}
+ */
 function stringifyAOR(aor) {
   return (aor.name || '') + ' <' + stringifyUri(aor.uri) + '>'+stringifyParams(aor.params);
 }
 
+/**
+ *
+ * @param a
+ * @returns {string|string}
+ */
 function stringifyAuthHeader(a) {
   var s = [];
 
@@ -296,6 +410,10 @@ function stringifyAuthHeader(a) {
 
 exports.stringifyAuthHeader = stringifyAuthHeader;
 
+/**
+ * 不同的头域有不同的处理函数，为头域处理函数列表
+ * @type {{"authentication-info": (function(*=): string), "refer-to": (function(*=): string), "www-authenticate": (function(*): *), via: (function(*): *), "record-route": (function(*): string|string), authorization: (function(*): *), path: (function(*): string|string), cseq: (function(*): string), route: (function(*): string|string), contact: (function(*): string), "proxy-authenticate": (function(*): *), from: (function(*=): string), to: (function(*=): string), "proxy-authorization": ((function(*): (*|undefined))|*)}}
+ */
 var stringifiers = {
   via: function(h) {
     return h.map(function(via) {
@@ -346,26 +464,41 @@ var stringifiers = {
   'refer-to': function(h) { return 'Refer-To: ' + stringifyAOR(h) + '\r\n'; }
 };
 
+/**
+ * 头域名称首字母变大写
+ * @param s
+ * @returns {string|*}
+ */
 function prettifyHeaderName(s) {
   if(s == 'call-id') return 'Call-ID';
 
-  return s.replace(/\b([a-z])/g, function(a) { return a.toUpperCase(); });
+  return s.replace(/\b([a-z])/g, function(a) {
+    return a.toUpperCase();
+  });
 }
 
+/**
+ * 将SIP消息对象转换成字符串
+ * @param m
+ * @returns {string}
+ */
 function stringify(m) {
   var s;
+  // 如果是应答消息则起始行为 "SIP/2.0 status reason\r\n"
   if(m.status) {
     s = 'SIP/' + stringifyVersion(m.version) + ' ' + m.status + ' ' + m.reason + '\r\n';
   }
+  // 如果是请求消息则起始行为 "method uri SIP/2.o\r\n
   else {
     s = m.method + ' ' + stringifyUri(m.uri) + ' SIP/' + stringifyVersion(m.version) + '\r\n';
   }
 
+  // 如果存在消息体，则添加头域 'content-length'=消息体长度
   m.headers['content-length'] = (m.content || '').length;
 
   for(var n in m.headers) {
-    if(typeof m.headers[n] !== "undefined") {
-      if(typeof m.headers[n] === 'string' || !stringifiers[n])
+    if(typeof m.headers[n] !== "undefined") { // 头域有值
+      if(typeof m.headers[n] === 'string' || !stringifiers[n]) // 头域值类型为字符串或者头域处理函数不存在
         s += prettifyHeaderName(n) + ': ' + m.headers[n] + '\r\n';
       else
         s += stringifiers[n](m.headers[n], n);
@@ -382,6 +515,14 @@ function stringify(m) {
 
 exports.stringify = stringify;
 
+/**
+ * 针对SIP请求，创建SIP应答对象
+ * @param rq SIP请求消息对象
+ * @param status 应答状态码
+ * @param reason 应答状态码简短描述
+ * @param extension 扩展字段，可以包含扩展的头域字段和消息体
+ * @returns {{reason: string, headers: {cseq, "call-id", from, to, via}, version, status}}
+ */
 function makeResponse(rq, status, reason, extension) {
   var rs = {
     status: status,
@@ -406,6 +547,12 @@ function makeResponse(rq, status, reason, extension) {
 
 exports.makeResponse = makeResponse;
 
+/**
+ *
+ * @param o
+ * @param deep
+ * @returns {*[]|*}
+ */
 function clone(o, deep) {
   if(o !== null && typeof o === 'object') {
     var r = Array.isArray(o) ? [] : {};
@@ -416,6 +563,12 @@ function clone(o, deep) {
   return o;
 }
 
+/**
+ *
+ * @param msg
+ * @param deep
+ * @returns {*[]|*|{reason, headers: (*[]|*), method, uri: (*[]|*), content, status: (*|number|UAStatus|SessionStatus|string|"rejected"|"fulfilled")}}
+ */
 exports.copyMessage = function(msg, deep) {
   if(deep) return clone(msg, true);
 
@@ -434,10 +587,23 @@ exports.copyMessage = function(msg, deep) {
   return r;
 }
 
+/**
+ *
+ * @param proto
+ * @returns {number}
+ */
 function defaultPort(proto) {
   return proto.toUpperCase() === 'TLS' ? 5061 : 5060;
 }
 
+/**
+ *
+ * @param onMessage
+ * @param onFlood
+ * @param maxBytesHeaders
+ * @param maxContentLength
+ * @returns {(function(*=): void)|*}
+ */
 function makeStreamParser(onMessage, onFlood, maxBytesHeaders, maxContentLength) {
 
   onFlood= onFlood || function(){};
@@ -447,6 +613,7 @@ function makeStreamParser(onMessage, onFlood, maxBytesHeaders, maxContentLength)
   var m;
   var r = '';
 
+  // 头数据分析处理回调函数
   function headers(data) {
     r += data;
 
@@ -484,6 +651,7 @@ function makeStreamParser(onMessage, onFlood, maxBytesHeaders, maxContentLength)
     }
   }
 
+  // 消息体数据处理分析回调函数
   function content(data) {
     r += data;
 
@@ -499,6 +667,7 @@ function makeStreamParser(onMessage, onFlood, maxBytesHeaders, maxContentLength)
     }
   }
 
+  // 默认正在处理头数据
   var state=headers;
 
   return function(data) { state(data); }
@@ -506,6 +675,11 @@ function makeStreamParser(onMessage, onFlood, maxBytesHeaders, maxContentLength)
 }
 exports.makeStreamParser = makeStreamParser;
 
+/**
+ *
+ * @param s
+ * @returns {{}}
+ */
 function parseMessage(s) {
   var r = s.toString('binary').match(/^\s*([\S\s]*?)\r\n\r\n([\S\s]*)$/);
   if(r) {
@@ -526,6 +700,11 @@ function parseMessage(s) {
 }
 exports.parse = parseMessage;
 
+/**
+ * 校验消息对象是否包含基本的SIP字段信息
+ * @param msg
+ * @returns {boolean}
+ */
 function checkMessage(msg) {
   return (msg.method || (msg.status >= 100 && msg.status <= 999)) &&
     msg.headers &&
@@ -537,20 +716,45 @@ function checkMessage(msg) {
     msg.headers.cseq;
 }
 
+/**
+ *
+ * @param protocol
+ * @param maxBytesHeaders
+ * @param maxContentLength
+ * @param connect 具体的连接回调函数，tcp就是net.connect函数
+ * @param createServer 创建流服务的函数，例如可以创建一个TCP服务器，接收TCP连接
+ * @param callback 收到的SIP消息的回调处理函数，目前来自事务层，也可以来自应用层？
+ * @returns {{get: (function(*, *=)), destroy: destroy, transport: string, open: ((function(*=, *=): *)|*)}}
+ */
 function makeStreamTransport(protocol, maxBytesHeaders, maxContentLength, connect, createServer, callback) {
   var remotes = Object.create(null);
   var flows = Object.create(null);
 
+  /**
+   *
+   * @param stream:net.Socket 与远端新建立的TCP连接套接字net.Socket
+   * @param remote 流的远程连接地址信息
+   * @returns {*}
+   */
   function init(stream, remote) {
+    // IP,port 作为ID，标识一个流
     var remoteid = [remote.address, remote.port].join(),
-      flowid = undefined,
-      refs = 0;
+    flowid = undefined,
+    refs = 0;
 
+    /**
+     *
+     */
     function register_flow() {
+      // remoteIP,remotePort,localIP,localPort 标识一个flow
       flowid = [remoteid,stream.localAddress, stream.localPort].join();
       flows[flowid] = remotes[remoteid];
     }
 
+    /**
+     * 收到的消息对象处理函数
+     * @param m 从流中收到并解析好的SIP消息对象
+     */
     var onMessage= function(m) {
 
       if(checkMessage(m)) {
@@ -562,6 +766,9 @@ function makeStreamTransport(protocol, maxBytesHeaders, maxContentLength, connec
 
     };
 
+    /**
+     * stream的数据量过大告警，关闭stream
+     */
     var onFlood= function() {
 
       console.log("Flood attempt, destroying stream");
@@ -570,13 +777,16 @@ function makeStreamTransport(protocol, maxBytesHeaders, maxContentLength, connec
 
     };
 
+    // 设置流编码为二进制
     stream.setEncoding('binary');
+    // 设置收到数据进行处理的回调函数
     stream.on('data', makeStreamParser( onMessage, onFlood, maxBytesHeaders, maxContentLength));
-
+    // 设置流关闭时的处理，
     stream.on('close',    function() {
       if(flowid) delete flows[flowid];
       delete remotes[remoteid];
     });
+    // 连接成功就将流注册到map表中
     stream.on('connect',  register_flow);
 
     stream.on('error',    function() {});
@@ -589,6 +799,11 @@ function makeStreamTransport(protocol, maxBytesHeaders, maxContentLength, connec
     stream.setTimeout(120000);
     stream.setMaxListeners(10000);
 
+    /**
+     *
+     * @param onError
+     * @returns {{protocol, release: NodeJS.Process.release, send: send}}
+     */
     remotes[remoteid] = function(onError) {
       ++refs;
       if(onError) stream.on('error', onError);
@@ -598,6 +813,10 @@ function makeStreamTransport(protocol, maxBytesHeaders, maxContentLength, connec
           if(onError) stream.removeListener('error', onError);
           if(--refs === 0) stream.emit('no_reference');
         },
+        /**
+         * 流式传输协议实际发送数据的地方
+         * @param m
+         */
         send: function(m) {
           stream.write(stringify(m), 'binary');
         },
@@ -610,11 +829,24 @@ function makeStreamTransport(protocol, maxBytesHeaders, maxContentLength, connec
     return remotes[remoteid];
   }
 
-  var server = createServer(function(stream) {
+  // 创建流监听服务器
+  var server = createServer(
+    /**
+     * 连接监听函数，当一个远程的TCP连接请求被接受后，将会创建一个流套接字，通过改监听函数返回给上层
+     * @param stream
+     */
+    function(stream) {
     init(stream, {protocol: protocol, address: stream.remoteAddress, port: stream.remotePort});
   });
 
   return {
+    transport: protocol+"Listener",
+    /**
+     * 流传输层，打开与远程端口的连接
+     * @param remote
+     * @param error
+     * @returns {*}
+     */
     open: function(remote, error) {
       var remoteid = [remote.address, remote.port].join();
 
@@ -622,16 +854,31 @@ function makeStreamTransport(protocol, maxBytesHeaders, maxContentLength, connec
 
       return init(connect(remote.port, remote.address), remote)(error);
     },
+    /**
+     *
+     * @param address
+     * @param error
+     * @returns {*}
+     */
     get: function(address, error) {
       var c = address.local ? flows[[address.address, address.port, address.local.address, address.local.port].join()]
         : remotes[[address.address, address.port].join()];
 
       return c && c(error);
     },
+    /**
+     *
+     */
     destroy: function() { server.close(); }
   };
 }
 
+/**
+ *
+ * @param options
+ * @param callback
+ * @returns {{get: (function(*, *=)), destroy: destroy, transport: string, open: ((function(*=, *=): *)|*)}}
+ */
 function makeTlsTransport(options, callback) {
   return makeStreamTransport(
     'TLS',
@@ -649,12 +896,30 @@ function makeTlsTransport(options, callback) {
     callback);
 }
 
+/**
+ * 创建创建TCP传输层，监听TCP端口，接受连接，并收发数据
+ * @param options
+ * @param callback
+ * @returns {{get: (function(*, *=)), destroy: destroy, open: ((function(*=, *=): (*))|*)}}
+ */
 function makeTcpTransport(options, callback) {
   return makeStreamTransport(
     'TCP',
     options.maxBytesHeaders,
     options.maxContentLength,
+    /**
+     * 流连接回调函数，根据选择的协议不同，有不同的启动连接的方式
+     * @param port
+     * @param host
+     * @param callback
+     * @returns {Socket}
+     */
     function(port, host, callback) { return net.connect(port, host, callback); },
+    /**
+     * 流服务创建回调函数，用于打开TCP端口的监听，接收连接请求
+     * @param callback 连接监听函数，当一个远程的TCP连接请求被接受后，将会创建一个TCP流套接字，通过改监听函数返回给上层
+     * @returns {Server} TCP监听服务套接字
+     */
     function(callback) {
       var server = net.createServer(callback);
       server.listen(options.port || 5060, options.address);
@@ -666,11 +931,20 @@ function makeTcpTransport(options, callback) {
     callback);
 }
 
+/**
+ * 创建WebSocket传输层，监听WS端口，接受WS连接
+ * @param options
+ * @param callback
+ * @returns {{get: ((function(*=, *=): ({protocol: string, release: function(), send: function(*=): void}|undefined))|*), destroy: destroy, open: ((function(*=, *=): ({protocol: string, release: function(), send: function(*=): void}|undefined))|*)}}
+ */
 function makeWsTransport(options, callback) {
   var flows = Object.create(null);
   var clients = Object.create(null);
 
-
+  /**
+   *
+   * @param ws
+   */
   function init(ws) {
     var remote = {address: ws._socket.remoteAddress, port: ws._socket.remotePort},
         local = {address: ws._socket.address().address, port: ws._socket.address().port},
@@ -687,6 +961,11 @@ function makeWsTransport(options, callback) {
     });
   }
 
+  /**
+   *
+   * @param uri
+   * @returns {(function(*=): {protocol: string, release: function(): void, send: function(*=): void})|*}
+   */
   function makeClient(uri) {
     if(clients[uri]) return clients[uri]();
 
@@ -694,8 +973,21 @@ function makeWsTransport(options, callback) {
         queue = [],
         refs = 0;
 
-    function send_connecting(m) { queue.push(stringify(m)); }
-    function send_open(m) { socket.send(new Buffer.from(typeof m === 'string' ? m : stringify(m), 'binary')); }
+    /**
+     *
+     * @param m
+     */
+    function send_connecting(m) {
+      queue.push(stringify(m));
+    }
+
+    /**
+     *
+     * @param m
+     */
+    function send_open(m) {
+      socket.send(new Buffer.from(typeof m === 'string' ? m : stringify(m), 'binary'));
+    }
     var send = send_connecting;
 
     socket.on('open', function() {
@@ -704,6 +996,11 @@ function makeWsTransport(options, callback) {
       queue.splice(0).forEach(send);
     });
 
+    /**
+     *
+     * @param onError
+     * @returns {{protocol: string, release: NodeJS.Process.release, send: send_connecting}}
+     */
     function open(onError) {
       ++refs;
       if(onError) socket.on('error', onError);
@@ -740,6 +1037,11 @@ function makeWsTransport(options, callback) {
     }
   }
 
+  /**
+   *
+   * @param flow
+   * @returns {{protocol: string, release: NodeJS.Process.release, send: send}}
+   */
   function get(flow) {
     var ws = flows[[flow.address, flow.port, flow.local.address, flow.local.port].join()];
     if(ws) {
@@ -756,6 +1058,12 @@ function makeWsTransport(options, callback) {
     }
   }
 
+  /**
+   *
+   * @param target
+   * @param onError
+   * @returns {{protocol: string, release: (function(): void), send: (function(*=): void)}|{protocol: string, release: NodeJS.Process.release, send: send}}
+   */
   function open(target, onError) {
     if(target.local)
       return get(target);
@@ -770,7 +1078,18 @@ function makeWsTransport(options, callback) {
   }
 }
 
+/**
+ *
+ * @param options
+ * @param callback
+ * @returns {{get: (function(*, *): {protocol: string, release: function(), send: function(*=): void}), destroy: destroy, open: (function(*, *): {protocol: string, release: function(), send: function(*=): void})}}
+ */
 function makeUdpTransport(options, callback) {
+  /**
+   *
+   * @param data
+   * @param rinfo
+   */
   function onMessage(data, rinfo) {
     var msg = parseMessage(data);
 
@@ -794,8 +1113,18 @@ function makeUdpTransport(options, callback) {
     options.logger.info("Listening %s:%d/UDP ...", address, port);
   }
 
+  /**
+   * 返回远端连接对象，里面send函数可以用于发送消息
+   * @param remote
+   * @param error
+   * @returns {{protocol: string, release: NodeJS.Process.release, send: send}}
+   */
   function open(remote, error) {
     return {
+      /**
+       * UDP协议的具体发送消息的函数
+       * @param m 消息对象，通过 stringify构造成字符串格式
+       */
       send: function(m) {
         var s = stringify(m);
         socket.send(new Buffer.from(s, 'binary'), 0, s.length, remote.port, remote.address);
@@ -806,12 +1135,19 @@ function makeUdpTransport(options, callback) {
   };
 
   return {
+    transport: "UdpTransport",
     open: open,
     get: open,
     destroy: function() { socket.close(); }
   }
 }
 
+/**
+ * 创建传输层对象
+ * @param options 参数
+ * @param callback 回调函数用于接收SIP消息
+ * @returns {{get: (function(*=, *=)), destroy: destroy, send: send, open: (function(*=, *=): any)}}
+ */
 function makeTransport(options, callback) {
   var protocols = {};
 
@@ -832,6 +1168,12 @@ function makeTransport(options, callback) {
   if(options.ws_port && WebSocket)
     protocols.WS = makeWsTransport(options, callbackAndLog);
 
+  /**
+   *
+   * @param obj
+   * @param target
+   * @returns {*}
+   */
   function wrap(obj, target) {
     return Object.create(obj, {send: {value: function(m) {
       if(m.method) {
@@ -849,13 +1191,31 @@ function makeTransport(options, callback) {
   }
 
   return {
+    /**
+     *
+     * @param target
+     * @param error
+     * @returns {*}
+     */
     open: function(target, error) {
       return wrap(protocols[target.protocol.toUpperCase()].open(target, error), target);
     },
+    /**
+     *
+     * @param target 是传输层返回上来的 remote 信息
+     * @param error
+     * @returns {any}
+     */
     get: function(target, error) {
-      var flow = protocols[target.protocol.toUpperCase()].get(target, error);
+      let transport = protocols[target.protocol.toUpperCase()];
+      var flow = transport.get(target, error);
       return flow && wrap(flow, target);
     },
+    /**
+     *
+     * @param target
+     * @param message
+     */
     send: function(target, message) {
       var cn = this.open(target);
       try {
@@ -865,6 +1225,9 @@ function makeTransport(options, callback) {
         cn.release();
       }
     },
+    /**
+     *
+     */
     destroy: function() {
       var protos = protocols;
       protocols = [];
@@ -875,6 +1238,11 @@ function makeTransport(options, callback) {
 
 exports.makeTransport = makeTransport;
 
+/**
+ *
+ * @param resolve
+ * @returns {(function(*=, *=): void)|*}
+ */
 function makeWellBehavingResolver(resolve) {
   var outstanding = Object.create(null);
 
@@ -899,6 +1267,12 @@ var resolveSrv = makeWellBehavingResolver(dns.resolveSrv);
 var resolve4 = makeWellBehavingResolver(dns.resolve4);
 var resolve6 = makeWellBehavingResolver(dns.resolve6);
 
+/**
+ *
+ * @param uri
+ * @param action
+ * @returns {*}
+ */
 function resolve(uri, action) {
   if(uri.params.transport === 'ws')
     return action([{protocol: uri.schema === 'sips' ? 'WSS' : 'WS', host: uri.host, port: uri.port || (uri.schema === 'sips' ? 433 : 80)}]);
@@ -908,6 +1282,11 @@ function resolve(uri, action) {
     return action([{protocol: protocol, address: uri.host, port: uri.port || defaultPort(protocol)}]);
   }
 
+  /**
+   *
+   * @param host
+   * @param cb
+   */
   function resolve46(host, cb) {
     resolve4(host, function(e4, a4) {
       resolve6(host, function(e6, a6) {
@@ -970,16 +1349,28 @@ function resolve(uri, action) {
 exports.resolve = resolve;
 
 //transaction layer
+/**
+ *
+ * @returns {string}
+ */
 function generateBranch() {
   return ['z9hG4bK',Math.round(Math.random()*1000000)].join('');
 }
 
 exports.generateBranch = generateBranch;
 
+/**
+ *
+ * @returns {{enter: enter, signal: NodeJS.ProcessReport.signal}}
+ */
 function makeSM() {
   var state;
 
   return {
+    /**
+     *
+     * @param newstate
+     */
     enter: function(newstate) {
       if(state && state.leave)
         state.leave();
@@ -989,6 +1380,10 @@ function makeSM() {
       if(state.enter)
         state.enter.apply(this, arguments);
     },
+    /**
+     *
+     * @param s
+     */
     signal: function(s) {
       if(state && state[s])
         state[Array.prototype.shift.apply(arguments)].apply(state, arguments);
@@ -996,14 +1391,27 @@ function makeSM() {
   };
 }
 
+/**
+ *
+ * @param transport
+ * @param cleanup
+ * @returns {{message: *, send: *, shutdown: Log4js.shutdown}}
+ */
 function createInviteServerTransaction(transport, cleanup) {
   var sm = makeSM();
   var rs;
 
   var proceeding = {
+    /**
+     *
+     */
     message: function() {
       if(rs) transport(rs);
     },
+    /**
+     *
+     * @param message
+     */
     send: function(message) {
       rs = message;
 
@@ -1018,6 +1426,9 @@ function createInviteServerTransaction(transport, cleanup) {
 
   var g, h;
   var completed = {
+    /**
+     *
+     */
     enter: function () {
       g = setTimeout(function retry(t) {
         g = setTimeout(retry, t*2, t*2);
@@ -1025,10 +1436,17 @@ function createInviteServerTransaction(transport, cleanup) {
       }, 500, 500);
       h = setTimeout(sm.enter.bind(sm, terminated), 32000);
     },
+    /**
+     *
+     */
     leave: function() {
       clearTimeout(g);
       clearTimeout(h);
     },
+    /**
+     *
+     * @param m
+     */
     message: function(m) {
       if(m.method === 'ACK')
         sm.enter(confirmed)
@@ -1039,14 +1457,38 @@ function createInviteServerTransaction(transport, cleanup) {
 
   var timer_i;
   var confirmed = {
-    enter: function() { timer_i = setTimeout(sm.enter.bind(sm, terminated), 5000);},
-    leave: function() { clearTimeout(timer_i); }
+    /**
+     *
+     */
+    enter: function() {
+      timer_i = setTimeout(sm.enter.bind(sm, terminated), 5000);
+    },
+    /**
+     *
+     */
+    leave: function() {
+      clearTimeout(timer_i);
+    }
   };
 
   var l;
   var accepted = {
-    enter: function() { l = setTimeout(sm.enter.bind(sm, terminated), 32000);},
-    leave: function() { clearTimeout(l); },
+    /**
+     *
+     */
+    enter: function() {
+      l = setTimeout(sm.enter.bind(sm, terminated), 32000);
+      },
+    /**
+     *
+     */
+    leave: function() {
+      clearTimeout(l);
+      },
+    /**
+     *
+     * @param m
+     */
     send: function(m) {
       rs = m;
       transport(rs);
@@ -1057,41 +1499,91 @@ function createInviteServerTransaction(transport, cleanup) {
 
   sm.enter(proceeding);
 
-  return {send: sm.signal.bind(sm, 'send'), message: sm.signal.bind(sm,'message'), shutdown: function() { sm.enter(terminated); }};
+  return {send: sm.signal.bind(sm, 'send'), message: sm.signal.bind(sm,'message'), shutdown: function() {
+    sm.enter(terminated);
+  }};
 }
 
+/**
+ *
+ * @param transport
+ * @param cleanup
+ * @returns {{message: *, send: *, shutdown: Log4js.shutdown}}
+ */
 function createServerTransaction(transport, cleanup) {
   var sm = makeSM();
   var rs;
 
   var trying = {
-    message: function() { if(rs) transport(rs); },
+    /**
+     *
+     */
+    message: function() {
+      if(rs)
+        transport(rs);
+      },
+    /**
+     *
+     * @param m
+     */
     send: function(m) {
       rs = m;
       transport(m);
-      if(m.status >= 200) sm.enter(completed);
+      if(m.status >= 200)
+        sm.enter(completed);
     }
   };
 
   var j;
   var completed = {
-    message: function() { transport(rs); },
-    enter: function() { j = setTimeout(function() { sm.enter(terminated); }, 32000); },
-    leave: function() { clearTimeout(j); }
+    /**
+     *
+     */
+    message: function() {
+      transport(rs);
+      },
+    /**
+     *
+     */
+    enter: function() {
+      j = setTimeout(function() {
+        sm.enter(terminated);
+        }, 32000);
+      },
+    /**
+     *
+     */
+    leave: function() {
+      clearTimeout(j);
+    }
   };
 
   var terminated = {enter: cleanup};
 
   sm.enter(trying);
 
-  return {send: sm.signal.bind(sm, 'send'), message: sm.signal.bind(sm, 'message'), shutdown: function() { sm.enter(terminated); }};
+  return {send: sm.signal.bind(sm, 'send'), message: sm.signal.bind(sm, 'message'), shutdown: function() {
+    sm.enter(terminated);
+  }};
 }
 
+/**
+ *
+ * @param rq
+ * @param transport
+ * @param tu
+ * @param cleanup
+ * @param options
+ * @returns {{message: *, shutdown: Log4js.shutdown}}
+ */
 function createInviteClientTransaction(rq, transport, tu, cleanup, options) {
   var sm = makeSM();
 
   var a, b;
   var calling = {
+    /**
+     *
+     */
     enter: function() {
       transport(rq);
 
@@ -1107,10 +1599,17 @@ function createInviteClientTransaction(rq, transport, tu, cleanup, options) {
         sm.enter(terminated);
       }, 32000);
     },
+    /**
+     *
+     */
     leave: function() {
       clearTimeout(a);
       clearTimeout(b);
     },
+    /**
+     *
+     * @param message
+     */
     message: function(message) {
       tu(message);
 
@@ -1124,6 +1623,10 @@ function createInviteClientTransaction(rq, transport, tu, cleanup, options) {
   };
 
   var proceeding = {
+    /**
+     *
+     * @param message
+     */
     message: function(message) {
       tu(message);
 
@@ -1148,23 +1651,48 @@ function createInviteClientTransaction(rq, transport, tu, cleanup, options) {
 
   var d;
   var completed = {
+    /**
+     *
+     * @param rs
+     */
     enter: function(rs) {
       ack.headers.to=rs.headers.to;
       transport(ack);
       d = setTimeout(sm.enter.bind(sm, terminated), 32000);
     },
+    /**
+     *
+     */
     leave: function() { clearTimeout(d); },
+    /**
+     *
+     * @param message
+     * @param remote
+     */
     message: function(message, remote) {
-      if(remote) transport(ack);  // we don't want to ack internally generated messages
+      if(remote)
+        transport(ack);  // we don't want to ack internally generated messages
     }
   };
 
   var timer_m;
   var accepted = {
+    /**
+     *
+     */
     enter: function() {
-      timer_m = setTimeout(function() { sm.enter(terminated); }, 32000);
+      timer_m = setTimeout(function() {
+        sm.enter(terminated);
+        }, 32000);
     },
+    /**
+     *
+     */
     leave: function() { clearTimeout(timer_m); },
+    /**
+     *
+     * @param m
+     */
     message: function(m) {
       if(m.status >= 200 && m.status <= 299)
         tu(m);
@@ -1173,11 +1701,23 @@ function createInviteClientTransaction(rq, transport, tu, cleanup, options) {
 
   var terminated = {enter: cleanup};
 
-  process.nextTick(function(){ sm.enter(calling); });
+  process.nextTick(function(){
+    sm.enter(calling);
+  });
 
-  return {message: sm.signal.bind(sm, 'message'), shutdown: function() { sm.enter(terminated); }};
+  return {message: sm.signal.bind(sm, 'message'), shutdown: function() {
+    sm.enter(terminated);
+  }};
 }
 
+/**
+ *
+ * @param rq
+ * @param transport
+ * @param tu
+ * @param cleanup
+ * @returns {{message: *, shutdown: Log4js.shutdown}}
+ */
 function createClientTransaction(rq, transport, tu, cleanup) {
   assert.ok(rq.method !== 'INVITE');
 
@@ -1185,16 +1725,31 @@ function createClientTransaction(rq, transport, tu, cleanup) {
 
   var e, f;
   var trying = {
+    /**
+     *
+     */
     enter: function() {
       transport(rq);
       if(!transport.reliable)
-        e = setTimeout(function() { sm.signal('timerE', 500); }, 500);
-      f = setTimeout(function() { sm.signal('timerF'); }, 32000);
+        e = setTimeout(function() {
+          sm.signal('timerE', 500);
+          }, 500);
+      f = setTimeout(function() {
+        sm.signal('timerF');
+        }, 32000);
     },
+    /**
+     *
+     */
     leave: function() {
       clearTimeout(e);
       clearTimeout(f);
     },
+    /**
+     *
+     * @param message
+     * @param remote
+     */
     message: function(message, remote) {
       if(message.status >= 200)
         sm.enter(completed);
@@ -1202,10 +1757,19 @@ function createClientTransaction(rq, transport, tu, cleanup) {
         sm.enter(proceeding);
       tu(message);
     },
+    /**
+     *
+     * @param t
+     */
     timerE: function(t) {
       transport(rq);
-      e = setTimeout(function() { sm.signal('timerE', t*2); }, t*2);
+      e = setTimeout(function() {
+        sm.signal('timerE', t*2);
+        }, t*2);
     },
+    /**
+     *
+     */
     timerF: function() {
       tu(makeResponse(rq, 408));
       sm.enter(terminated);
@@ -1213,6 +1777,11 @@ function createClientTransaction(rq, transport, tu, cleanup) {
   };
 
   var proceeding = {
+    /**
+     *
+     * @param message
+     * @param remote
+     */
     message: function(message, remote) {
       if(message.status >= 200)
         sm.enter(completed);
@@ -1222,28 +1791,59 @@ function createClientTransaction(rq, transport, tu, cleanup) {
 
   var k;
   var completed = {
-    enter: function() { k = setTimeout(function() { sm.enter(terminated); }, 5000); },
+    /**
+     *
+     */
+    enter: function() {
+      k = setTimeout(function() {
+        sm.enter(terminated);
+        }, 5000);
+      },
+    /**
+     *
+     */
     leave: function() { clearTimeout(k); }
   };
 
   var terminated = {enter: cleanup};
 
-  process.nextTick(function() { sm.enter(trying); });
+  process.nextTick(function() {
+    sm.enter(trying);
+  });
 
-  return {message: sm.signal.bind(sm, 'message'), shutdown: function() { sm.enter(terminated); }};
+  return {message: sm.signal.bind(sm, 'message'), shutdown: function() {
+    sm.enter(terminated);
+  }};
 }
 
+/**
+ * 生成事务ID，由收到的SIP消息中，method\call-id\branch字段组合在一起
+ * @param m SIP消息对象
+ * @returns {string} method,call-id,branch
+ */
 function makeTransactionId(m) {
   if(m.method === 'ACK')
     return ['INVITE', m.headers['call-id'], m.headers.via[0].params.branch].join();
   return [m.headers.cseq.method, m.headers['call-id'], m.headers.via[0].params.branch].join();
 }
 
+/**
+ *
+ * @param options
+ * @param transport
+ * @returns {{getServer: (function(*=): *), destroy: destroy, createClientTransaction: (function(*=, *=, *=): {message: *, shutdown: function(): void}), getClient: (function(*=): *), createServerTransaction: (function(*=, *=): {message: *, send: *, shutdown: function(): void})}}
+ */
 function makeTransactionLayer(options, transport) {
   var server_transactions = Object.create(null);
   var client_transactions = Object.create(null);
 
   return {
+    /**
+     *
+     * @param rq
+     * @param cn
+     * @returns {{message: *, send: *, shutdown: function(): void}}
+     */
     createServerTransaction: function(rq, cn) {
       var id = makeTransactionId(rq);
 
@@ -1254,8 +1854,16 @@ function makeTransactionLayer(options, transport) {
           cn.release();
         });
     },
+    /**
+     * 创建客户端事务？
+     * @param connection
+     * @param rq
+     * @param callback
+     * @returns {{message: *, shutdown: function(): void}}
+     */
     createClientTransaction: function(connection, rq, callback) {
-      if(rq.method !== 'CANCEL') rq.headers.via[0].params.branch = generateBranch();
+      if(rq.method !== 'CANCEL')
+        rq.headers.via[0].params.branch = generateBranch();
 
 
       if(typeof rq.headers.cseq !== 'object')
@@ -1272,12 +1880,25 @@ function makeTransactionLayer(options, transport) {
         },
         options);
     },
+    /**
+     *
+     * @param m
+     * @returns {*}
+     */
     getServer: function(m) {
       return server_transactions[makeTransactionId(m)];
     },
+    /**
+     *
+     * @param m
+     * @returns {*}
+     */
     getClient: function(m) {
       return client_transactions[makeTransactionId(m)];
     },
+    /**
+     * 删除所有的事务
+     */
     destroy: function() {
       Object.keys(client_transactions).forEach(function(x) { client_transactions[x].shutdown(); });
       Object.keys(server_transactions).forEach(function(x) { server_transactions[x].shutdown(); });
@@ -1287,14 +1908,27 @@ function makeTransactionLayer(options, transport) {
 
 exports.makeTransactionLayer = makeTransactionLayer;
 
+/**
+ * 序列查找
+ * @param transaction
+ * @param connect
+ * @param addresses
+ * @param rq
+ * @param callback
+ */
 function sequentialSearch(transaction, connect, addresses, rq, callback) {
   if(rq.method !== 'CANCEL') {
-    if(!rq.headers.via) rq.headers.via = [];
+    if(!rq.headers.via)
+      rq.headers.via = [];
     rq.headers.via.unshift({params:{}});
   }
 
   var onresponse;
   var lastStatusCode;
+
+  /**
+   *
+   */
   function next() {
     onresponse = searching;
 
@@ -1306,7 +1940,9 @@ function sequentialSearch(transaction, connect, addresses, rq, callback) {
             console.log("err: ", err);
           }
           client.message(makeResponse(rq, 503));
-        }), rq, function() { onresponse.apply(null, arguments); });
+        }), rq, function() {
+          onresponse.apply(null, arguments);
+        });
       }
       catch(e) {
         onresponse(address.local ? makeResponse(rq, 430) : makeResponse(rq, 503));
@@ -1318,6 +1954,10 @@ function sequentialSearch(transaction, connect, addresses, rq, callback) {
     }
   }
 
+  /**
+   *
+   * @param rs
+   */
   function searching(rs) {
     lastStatusCode = rs.status;
     if(rs.status === 503)
@@ -1331,14 +1971,31 @@ function sequentialSearch(transaction, connect, addresses, rq, callback) {
   next();
 }
 
+/**
+ *
+ * @param options 启动参数
+ * @param callback(msg, remote, stream):void 应用层的回调函数，用于处理收到的SIP消息，msg收到的SIP消息对象，remote里面有对端连接信息，stream在流连接时有用
+ * @returns {{hostname: (function(): *|string), decodeFlowUri: (function(*=): {protocol: string, address: string, port: number, local: {address: string, port: number}}|undefined), uas: module:events.EventEmitter, destroy: destroy, send: send, encodeFlowUri: (function(*=): {schema: string, host: *|string, params: {}, user: *}), isFlowUri: (function(*=): boolean)}}
+ */
 exports.create = function(options, callback) {
+  // 创建错误日志函数
   var errorLog = (options.logger && options.logger.error) || function() {};
 
-  var transport = makeTransport(options, function(m,remote) {
+  /**
+   *
+   * @type {{get: (function(*=, *=)), destroy: destroy, send: send, open: (function(*=, *=): *)}}
+   * UDP时 remote 对象：{protocol: 'UDP', address: rinfo.address, port: rinfo.port, local: {address: address, port: port}}
+   * TCP/TLS时 remote 对象：{protocol: remote.protocol, address: stream.remoteAddress, port: stream.remotePort, local: { address: stream.localAddress, port: stream.localPort}}
+   * WS/WSS时 remote 对象：{protocol: 'WS', address: remote.address, port: remote.port, local: local}
+   */
+  var transport = makeTransport(options, function(m,remote, stream) {
     try {
+      // 根据收到的消息，查找是否有相应事务
       var t = m.method ? transaction.getServer(m) : transaction.getClient(m);
 
+      // 事务不存在，则需要创建事务，然后将消息返回给应用层
       if(!t) {
+        // 消息是非ACK请求消息，那么创建server事务
         if(m.method && m.method !== 'ACK') {
           var t = transaction.createServerTransaction(m, transport.get(remote));
           try {
@@ -1366,6 +2023,11 @@ exports.create = function(options, callback) {
   var port = options.port || 5060;
   var rbytes = crypto.randomBytes(20);
 
+  /**
+   *
+   * @param flow
+   * @returns {string}
+   */
   function encodeFlowToken(flow) {
     var s = [flow.protocol, flow.address, flow.port, flow.local.address, flow.local.port].join();
     var h = crypto.createHmac('sha1', rbytes);
@@ -1373,6 +2035,11 @@ exports.create = function(options, callback) {
     return toBase64([h.digest('base64'), s].join());
   }
 
+  /**
+   *
+   * @param token
+   * @returns {{protocol: string, address: string, port: number, local: {address: string, port: number}}|undefined}
+   */
   function decodeFlowToken(token) {
     var s = (new Buffer.from(token, 'base64')).toString('ascii').split(',');
     if(s.length != 6) return;
@@ -1383,6 +2050,11 @@ exports.create = function(options, callback) {
   }
 
   return {
+    /**
+     *
+     * @param m
+     * @param callback
+     */
     send: function(m, callback) {
       if(m.method === undefined) {
         var t = transaction.getServer(m);
@@ -1448,17 +2120,39 @@ exports.create = function(options, callback) {
         });
       }
     },
+    /**
+     *
+     * @param flow
+     * @returns {{schema: (string), host: (*|string), params: {}, user: string}}
+     */
     encodeFlowUri: function(flow) {
       return {schema: flow.protocol === 'TLS' ? 'sips' : 'sip', user: encodeFlowToken(flow), host: hostname, params:{}};
     },
+    /**
+     *
+     * @param uri
+     * @returns {{protocol: string, address: string, port: number, local: {address: string, port: number}}|undefined}
+     */
     decodeFlowUri: function(uri) {
       uri = parseUri(uri);
       return uri.host === hostname ? decodeFlowToken(uri.user) : undefined;
     },
+    /**
+     *
+     * @param uri
+     * @returns {boolean}
+     */
     isFlowUri: function(uri) {
       return !!!decodeFlowUri(uri);
     },
+    /**
+     *
+     * @returns {*|string}
+     */
     hostname: function() { return hostname; },
+    /**
+     *
+     */
     destroy: function() {
       transaction.destroy();
       transport.destroy();
@@ -1466,6 +2160,11 @@ exports.create = function(options, callback) {
   }
 }
 
+/**
+ * 启动SIP协议栈
+ * @param options
+ * @param callback
+ */
 exports.start = function(options, callback) {
   var r = exports.create(options, callback);
 

@@ -3,17 +3,30 @@ var util=require('util');
 
 var contexts = {};
 
+/**
+ *
+ * @param msg
+ * @returns {*[]}
+ */
 function makeContextId(msg) {
   var via = msg.headers.via[0];
   return [via.params.branch, via.protocol, via.host, via.port, msg.headers['call-id'], msg.headers.cseq.seq];
 }
 
+/**
+ *
+ * @param rs
+ */
 function defaultCallback(rs) {
   rs.headers.via.shift();
   exports.send(rs);
 }
 
-
+/**
+ *
+ * @param msg
+ * @param callback
+ */
 exports.send = function(msg, callback) {
   var ctx = contexts[makeContextId(msg)];
 
@@ -25,7 +38,12 @@ exports.send = function(msg, callback) {
   return msg.method ? forwardRequest(ctx, msg, callback || defaultCallback) : forwardResponse(ctx, msg);
 };
 
-
+/**
+ *
+ * @param ctx
+ * @param rs
+ * @param callback
+ */
 function forwardResponse(ctx, rs, callback) {
   if(+rs.status >= 200) {
     delete contexts[makeContextId(rs)];
@@ -34,7 +52,12 @@ function forwardResponse(ctx, rs, callback) {
   sip.send(rs);
 }
 
-
+/**
+ *
+ * @param rq
+ * @param via
+ * @param route
+ */
 function sendCancel(rq, via, route) {
   sip.send({
     method: 'CANCEL',
@@ -50,13 +73,20 @@ function sendCancel(rq, via, route) {
   });
 }
 
-
+/**
+ *
+ * @param ctx
+ * @param rq
+ * @param callback
+ */
 function forwardRequest(ctx, rq, callback) {
   var route = rq.headers.route && rq.headers.route.slice();
   sip.send(rq, function(rs, remote) {
     if(+rs.status < 200) {
       var via = rs.headers.via[0];
-      ctx.cancellers[rs.headers.via[0].params.branch] = function() { sendCancel(rq, via, route); };
+      ctx.cancellers[rs.headers.via[0].params.branch] = function() {
+        sendCancel(rq, via, route);
+      };
 
       if(ctx.cancelled)
         sendCancel(rq, via, route);
@@ -69,7 +99,12 @@ function forwardRequest(ctx, rq, callback) {
   });
 }
 
-
+/**
+ *
+ * @param rq
+ * @param route
+ * @param remote
+ */
 function onRequest(rq, route, remote) {
   var id = makeContextId(rq);
   contexts[id] = { cancellers: {} };
@@ -82,7 +117,11 @@ function onRequest(rq, route, remote) {
   }
 };
 
-
+/**
+ *
+ * @param options
+ * @param route
+ */
 exports.start = function(options, route) {
   sip.start(options, function(rq, remote) {
     if(rq.method === 'CANCEL') {
