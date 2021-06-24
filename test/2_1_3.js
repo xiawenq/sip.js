@@ -1,6 +1,6 @@
 var sip = require('../sip.js');
 var assert = require('assert');
-var udp = require('../udp.js');
+// var udp = require('../udp.js');
 var util = require('util');
 
 var msg = {

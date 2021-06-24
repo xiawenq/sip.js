@@ -1,6 +1,6 @@
 var sip = require('../sip.js');
 var assert = require('assert');
-var udp = require('../udp.js');
+// var udp = require('../udp.js');
 var util = require('util');
 var net = require('net');
 
@@ -40,7 +40,7 @@ sendSocket.setEncoding('ascii');
 sendSocket.on('data', sip.makeStreamParser(function(m) {
   assert.deepEqual(m.headers, resp.headers);
   assert.deepEqual(m, resp);
-})) 
+}))
 
 sendSocket.on('end', function() {
   sendSocket.end();
