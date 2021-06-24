@@ -296,8 +296,8 @@ function parse(data) {
 }
 
 /**
- *
- * @param s
+ * 解析URI字符串数据并对象化
+ * @param s 要解析的URI字符串，类似 sip:11010200001320000001@192.168.27.95:20002;transport=tcp 这种格式
  * @returns {{schema: string, headers: T, password: string, port: number, host: string, params: T, user: string}|*}
  */
 function parseUri(s) {
@@ -314,7 +314,7 @@ function parseUri(s) {
       user: r[2],
       password: r[3],
       host: r[4],
-      port: +r[5],
+      port: +r[5], // +r[5] 为将 r[5] 从 string 类型变成 number 类型
       params: (r[6].match(/([^;=]+)(=([^;=]+))?/g) || [])
         .map(function(s) { return s.split('='); })
         .reduce(function(params, x) { params[x[0]]=x[1] || null; return params;}, {}),
@@ -960,6 +960,7 @@ function makeWsTransport(options, callback) {
    * @param ws 新的WS连接对象
    */
   function init(ws) {
+    options.logger && options.logger.info && options.logger.info("recv a new ws connection\n"+ws);
     var remote = {address: ws._socket.remoteAddress, port: ws._socket.remotePort},
         local = {address: ws._socket.address().address, port: ws._socket.address().port},
         flowid = [remote.address, remote.port, local.address, local.port].join();
@@ -968,6 +969,7 @@ function makeWsTransport(options, callback) {
 
     ws.on('close', function() { delete flows[flowid]; });
     ws.on('message', function(data) {
+      options.logger && options.logger.info && options.logger.info("recv a new ws connection\n"+ws);
       var msg = parseMessage(data);
       if(msg) {
         callback(msg, {protocol: 'WS', address: remote.address, port: remote.port, local: local});
@@ -1366,7 +1368,7 @@ exports.resolve = resolve;
 
 //transaction layer
 /**
- *
+ * 随机生成Branch值
  * @returns {string}
  */
 function generateBranch() {
@@ -1376,7 +1378,7 @@ function generateBranch() {
 exports.generateBranch = generateBranch;
 
 /**
- *
+ * 创建信号管理对象，管理啥？
  * @returns {{enter: enter, signal: NodeJS.ProcessReport.signal}}
  */
 function makeSM() {
@@ -1384,8 +1386,8 @@ function makeSM() {
 
   return {
     /**
-     *
-     * @param newstate
+     * 新状态处理函数
+     * @param newstate 新的状态对象
      */
     enter: function(newstate) {
       if(state && state.leave)
@@ -1393,27 +1395,32 @@ function makeSM() {
 
       state = newstate;
       Array.prototype.shift.apply(arguments);
-      if(state.enter)
+      if(state.enter) {
+        // 如果新状态有下一步处理函数，执行新状态对象的下一步处理函数
         state.enter.apply(this, arguments);
+      }
     },
     /**
-     *
-     * @param s
+     * 收到信号，查找具体的事件名称，调用注册的事件回调函数处理事件
+     * @param s 收到的信号事件名称
      */
     signal: function(s) {
-      if(state && state[s])
-        state[Array.prototype.shift.apply(arguments)].apply(state, arguments);
+      if(state && state[s]) {
+        // Array.prototype.shift()删除数组的第一个元素，并返回这个元素。
+        let eventName = Array.prototype.shift.apply(arguments)
+        state[eventName].apply(state, arguments);
+      }
     }
   };
 }
 
 /**
- *
- * @param transport
- * @param cleanup
- * @returns {{message: *, send: *, shutdown: Log4js.shutdown}}
+ * INVITE专用的请求事务创建
+ * @param transport 传输通道的发送回调函数，用于发送消息给对方
+ * @param cleanup 事务失败的回调函数，处理事务，关闭通道或者其他操作
+ * @returns {{message: *, send: *, shutdown: function(): void}}
  */
-function createInviteServerTransaction(transport, cleanup) {
+function _createInviteServerTransaction(transport, cleanup) {
   var sm = makeSM();
   var rs;
 
@@ -1522,17 +1529,17 @@ function createInviteServerTransaction(transport, cleanup) {
 
 /**
  *
- * @param transport
- * @param cleanup
- * @returns {{message: *, send: *, shutdown: Log4js.shutdown}}
+ * @param transport 传输通道的 send 函数，用于发送消息
+ * @param cleanup 出现错误时的回调处理函数，用于处理错误
+ * @returns {{message: *, send: *, shutdown: shutdown}} 返回事务对象，其中 message 和 send 用于发送SIP消息， shutdown 用于关闭事务
  */
-function createServerTransaction(transport, cleanup) {
+function _createServerTransaction(transport, cleanup) {
   var sm = makeSM();
   var rs;
 
   var trying = {
     /**
-     *
+     * 发送消息
      */
     message: function() {
       if(rs)
@@ -1578,8 +1585,11 @@ function createServerTransaction(transport, cleanup) {
 
   sm.enter(trying);
 
-  return {send: sm.signal.bind(sm, 'send'), message: sm.signal.bind(sm, 'message'), shutdown: function() {
-    sm.enter(terminated);
+  return {
+    send: sm.signal.bind(sm, 'send'),
+    message: sm.signal.bind(sm, 'message'),
+    shutdown: function() {
+      sm.enter(terminated);
   }};
 }
 
@@ -1846,7 +1856,7 @@ function makeTransactionId(m) {
 /**
  *
  * @param options
- * @param transport
+ * @param transport 传输层管理者对象的 open 函数，为啥没有用到？
  * @returns {{getServer: (function(*=): *), destroy: destroy, createClientTransaction: (function(*=, *=, *=): {message: *, shutdown: function(): void}), getClient: (function(*=): *), createServerTransaction: (function(*=, *=): {message: *, send: *, shutdown: function(): void})}}
  */
 function makeTransactionLayer(options, transport) {
@@ -1855,15 +1865,15 @@ function makeTransactionLayer(options, transport) {
 
   return {
     /**
-     *
-     * @param rq
-     * @param cn
+     * 针对SIP请求，创建服务器端事务对象
+     * @param rq SIP请求对象
+     * @param cn 传输层中具体的传输通道对象
      * @returns {{message: *, send: *, shutdown: function(): void}}
      */
     createServerTransaction: function(rq, cn) {
       var id = makeTransactionId(rq);
 
-      return server_transactions[id] = (rq.method === 'INVITE' ? createInviteServerTransaction : createServerTransaction)(
+      return server_transactions[id] = (rq.method === 'INVITE' ? _createInviteServerTransaction : _createServerTransaction)(
         cn.send.bind(cn),
         function() {
           delete server_transactions[id];
@@ -1991,27 +2001,33 @@ function sequentialSearch(transaction, connect, addresses, rq, callback) {
  * 创建SIP协议栈对象，里面包含了 Transport 处理成和 Transaction 处理层
  * @param options 启动参数
  * @param callback(msg, remote, stream):void 应用层的回调函数，用于处理收到的SIP消息，msg收到的SIP消息对象，remote里面有对端连接信息，stream在流连接时有用
- * @returns {{hostname: (function(): *|string), decodeFlowUri: (function(*=): {protocol: string, address: string, port: number, local: {address: string, port: number}}|undefined), uas: module:events.EventEmitter, destroy: destroy, send: send, encodeFlowUri: (function(*=): {schema: string, host: *|string, params: {}, user: *}), isFlowUri: (function(*=): boolean)}}
+ * @returns {{hostname: (function(): *|string), decodeFlowUri: (function(*=): *), destroy: destroy, send: send, encodeFlowUri: (function(*=): {schema: string, host: (*|string), params: {}, user: string}), isFlowUri: (function(*=): boolean)}}
  */
 exports.create = function(options, callback) {
   // 创建错误日志函数
   var errorLog = (options.logger && options.logger.error) || function() {};
 
   /**
-   *
+   * 创建传输层管理者对象，提供消息处理回调函数，当传输层收到数据包时，调用该函数将消息返回给事务层进行处理
    * @type {{get: (function(*=, *=)), destroy: destroy, send: send, open: (function(*=, *=): *)}}
-   * UDP时 remote 对象：{protocol: 'UDP', address: rinfo.address, port: rinfo.port, local: {address: address, port: port}}
-   * TCP/TLS时 remote 对象：{protocol: remote.protocol, address: stream.remoteAddress, port: stream.remotePort, local: { address: stream.localAddress, port: stream.localPort}}
-   * WS/WSS时 remote 对象：{protocol: 'WS', address: remote.address, port: remote.port, local: local}
    */
-  var transport = makeTransport(options, function(m,remote, stream) {
+  var transport = makeTransport(options,
+    /**
+     * 消息处理回调函数，当传输层收到数据包时，调用该函数将消息返回给事务层进行处理
+     * @param m 收到的SIP消息，已经序列化成对象
+     * @param remote  UDP时 remote 对象：{protocol: 'UDP', address: rinfo.address, port: rinfo.port, local: {address: address, port: port}}
+     *                TCP/TLS时 remote 对象：{protocol: remote.protocol, address: stream.remoteAddress, port: stream.remotePort, local: { address: stream.localAddress, port: stream.localPort}}
+     *                WS/WSS时 remote 对象：{protocol: 'WS', address: remote.address, port: remote.port, local: local}
+     * @param stream 如果是流式传输协议，则该值有效，且为流式传输的套接字
+     */
+    function(m,remote, stream) {
     try {
       // 根据收到的消息，查找是否有相应事务
       var t = m.method ? transaction.getServer(m) : transaction.getClient(m);
 
       // 事务不存在，则需要创建事务，然后将消息返回给应用层
       if(!t) {
-        // 消息是非ACK请求消息，那么创建server事务
+        // 收到消息是非ACK请求消息，那么创建server事务，再将消息返回给应用层
         if(m.method && m.method !== 'ACK') {
           var t = transaction.createServerTransaction(m, transport.get(remote));
           try {
@@ -2021,10 +2037,12 @@ exports.create = function(options, callback) {
             throw e;
           }
         }
+        // 如果请求消息是ACK请求，直接将ACK请求发送给上层
         else if(m.method === 'ACK') {
           callback(m,remote);
         }
       }
+      // 事务存在，
       else {
         t.message && t.message(m, remote);
       }
@@ -2068,14 +2086,16 @@ exports.create = function(options, callback) {
   return {
     /**
      *
-     * @param m
+     * @param m SIP消息对象
      * @param callback
      */
     send: function(m, callback) {
+      // 非SIP请求消息，则是响应消息，查找到SIP响应消息对应事务对象，并执行发送
       if(m.method === undefined) {
         var t = transaction.getServer(m);
         t && t.send && t.send(m);
       }
+      // m 为SIP请求消息对象
       else {
         var hop = parseUri(m.uri);
 
@@ -2132,7 +2152,12 @@ exports.create = function(options, callback) {
             }
           }
           else
-            sequentialSearch(transaction.createClientTransaction.bind(transaction), transport.open.bind(transport), addresses, m, callback || function() {});
+            sequentialSearch(
+              transaction.createClientTransaction.bind(transaction)
+              , transport.open.bind(transport)
+              , addresses
+              , m
+              , callback || function() {});
         });
       }
     },
