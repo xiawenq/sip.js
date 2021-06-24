@@ -25,16 +25,22 @@
   },
   "devDependencies": {
     "@types/node": "^15.12.2",
-    "ts-node": "^10.0.0",
-    "typescript": "^4.3.2",
-    "xml2js": "^0.4.23",
-    "xml-js": "^1.6.11",
-    "jssip": "^3.7.9",
+    "coffee-script": "~1.6.2",
+    "grunt": "^1.4.1",
     "json": "^11.0.0",
+    "jssip": "^3.7.9",
     "log4js": "^6.3.0",
     "log4js-extend": "^0.2.1",
-    "coffee-script": "~1.6.2",
-    "parsip": "^1.0.6"
+    "parsip": "^1.0.6",
+    "sys": "0.0.1",
+    "ts-node": "^10.0.0",
+    "typescript": "^4.3.2",
+    "xml-js": "^1.6.11",
+    "xml2js": "^0.4.23",
+    "inquirer": "^8.1.1",
+    "chalk": "^4.1.1",
+    "figlet": "^1.5.0",
+    "shelljs": "^0.8.4"
   },
   "types": "./types/sip.d.ts"
 }
