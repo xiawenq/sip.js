@@ -9,7 +9,7 @@ var crypto = require('crypto');
 var WebSocket = require('ws');
 
 /**
- *
+ * 调试输出函数
  * @param e
  */
 function debug(e) {
@@ -40,10 +40,10 @@ function toBase64(s) {
 }
 // Actual stack code begins here
 /**
- *
- * @param rs
- * @param m
- * @returns {*}
+ * 解析SIP响应消息的起始行内容并返回，获取 version status reasion 信息
+ * @param rs SIP起始行字符串
+ * @param m version status reasion 信息存放与对象m中
+ * @returns {*} 返回参数 m
  */
 function parseResponse(rs, m) {
   var r = rs.match(/^SIP\/(\d+\.\d+)\s+(\d+)\s*(.*)\s*$/);
@@ -58,10 +58,10 @@ function parseResponse(rs, m) {
 }
 
 /**
- *
- * @param rq
- * @param m
- * @returns {*}
+ * 解析SIP请求消息的起始行内容并返回，获取 method uri version 信息
+ * @param rq SIP的起始行字符串
+ * @param m method uri version 信息存放在对象m中
+ * @returns {*} 返回参数 m
  */
 function parseRequest(rq, m) {
   var r = rq.match(/^([\w\-.!%*_+`'~]+)\s([^\s]+)\sSIP\s*\/\s*(\d+\.\d+)/);
@@ -76,10 +76,10 @@ function parseRequest(rq, m) {
 }
 
 /**
- *
- * @param regex
- * @param data
- * @returns {*}
+ * 使用正则表达式模式对字符串执行搜索，并返回包含该搜索结果的数组。
+ * @param regex 正则表达式
+ * @param data 要对其执行搜索的字符串对象或字符串文本。
+ * @returns {*} 返回包含该手术结果的数组
  */
 function applyRegex(regex, data) {
   regex.lastIndex = data.i;
@@ -92,10 +92,10 @@ function applyRegex(regex, data) {
 }
 
 /**
- *
- * @param data
- * @param hdr
- * @returns {{params}|*}
+ * 解析头域中的参数信息到params数组中，例如：SIP/2.0/TCP 192.168.123.138:52546;rport;branch=z9hG4bK1956524456 rport和branch为两个参数，且 hdr.params[rport]=null, hdr.params[branch]=z9hG4bK1956524456
+ * @param data 一行头域字符串，例如 SIP/2.0/TCP 192.168.123.138:52546;rport;branch=z9hG4bK1956524456
+ * @param hdr 头域对象，解析的参数会放在 hdr.params数组中
+ * @returns {{params}|*} 返回 hdr
  */
 function parseParams(data, hdr) {
   hdr.params = hdr.params || {};
@@ -110,11 +110,11 @@ function parseParams(data, hdr) {
 }
 
 /**
- *
- * @param parser
- * @param d
- * @param h
- * @returns []
+ * 处理相同头域名的多个头域信息
+ * @param parser 回调函数用于处理一个头域信息
+ * @param d 字符串数组，一个头域的值
+ * @param h 存放结构化的头域信息
+ * @returns [] 返回参数 h
  */
 function parseMultiHeader(parser, d, h) {
   h = h || [];
@@ -128,7 +128,7 @@ function parseMultiHeader(parser, d, h) {
 }
 
 /**
- *
+ * 处理通用头
  * @param d
  * @param h
  * @returns {string|string|*}
@@ -138,7 +138,7 @@ function parseGenericHeader(d, h) {
 }
 
 /**
- *
+ * 解析例如这种格式字符串 <sip:34020000002000000011@127.0.0.1:5225>;tag=765969836
  * @param data
  * @returns {*}
  */
@@ -161,9 +161,9 @@ function parseAorWithUri(data) {
 }
 
 /**
- *
- * @param data
- * @returns {*}
+ * 专门处理VIA头域的值的函数
+ * @param data 字符串
+ * @returns {*} 返回处理后结构化的头域值
  */
 function parseVia(data) {
   var r = applyRegex(/SIP\s*\/\s*(\d+\.\d+)\s*\/\s*([\S]+)\s+([^\s;:]+)(?:\s*:\s*(\d+))?/g, data);
@@ -215,6 +215,10 @@ function parseAuthenticationInfoHeader(d) {
   return a;
 }
 
+/**
+ * 头域名的缩写对应的全拼头域名
+ * @type {{c: string, s: string, t: string, e: string, f: string, v: string, i: string, k: string, l: string, m: string}}
+ */
 var compactForm = {
   i: 'call-id',
   m: 'contact',
@@ -229,7 +233,7 @@ var compactForm = {
 };
 
 /**
- *
+ * 头域处理回调函数列表，给定头域名返回具体的头域值处理函数
  * @type {{"content-length": (function(*): number), "authentication-info": (function(*=): {}), "refer-to": (function(*=): {params}|*), "www-authenticate": any, "record-route": any, via: any, authorization: any, path: any, cseq: (function(*): {method: string, seq}), route: any, contact: ((function(*=, *=): (*))|*), "proxy-authenticate": any, from: (function(*=): {params}|*), to: (function(*=): {params}|*), "proxy-authorization": any}}
  */
 var parsers = {
@@ -256,9 +260,9 @@ var parsers = {
 };
 
 /**
- *
- * @param data
- * @returns {{}}
+ * 解析SIP消息的起始行和头域信息，转换成对象返回
+ * @param data SIP消息字符串，包含起始行和头域信息
+ * @returns {{}} 返回解析的SIP消息的对象
  */
 function parse(data) {
   data = data.split(/\r\n(?![ \t])/);
@@ -333,9 +337,9 @@ function stringifyVersion(v) {
 }
 
 /**
- *
- * @param params
- * @returns {string}
+ * 将参数数组对象字符串化，串联起来，用,号分隔
+ * @param params 参数数组对象
+ * @returns {string} 串联的参数数组字符串
  */
 function stringifyParams(params) {
   var s = '';
@@ -347,8 +351,8 @@ function stringifyParams(params) {
 }
 
 /**
- * 校验URI
- * @param uri
+ * 字符串化URI对象
+ * @param uri 对象
  * @returns {string}
  */
 function stringifyUri(uri) {
@@ -383,8 +387,8 @@ function stringifyUri(uri) {
 exports.stringifyUri = stringifyUri;
 
 /**
- *
- * @param aor
+ * 字符串化对象
+ * @param aor 对象
  * @returns {string}
  */
 function stringifyAOR(aor) {
@@ -392,8 +396,8 @@ function stringifyAOR(aor) {
 }
 
 /**
- *
- * @param a
+ * 字符串化对象
+ * @param a 对象
  * @returns {string|string}
  */
 function stringifyAuthHeader(a) {
@@ -411,7 +415,7 @@ function stringifyAuthHeader(a) {
 exports.stringifyAuthHeader = stringifyAuthHeader;
 
 /**
- * 不同的头域有不同的处理函数，为头域处理函数列表
+ * 不同的头域对象有不同的字符串化处理函数，为个头域字符串化处理函数列表
  * @type {{"authentication-info": (function(*=): string), "refer-to": (function(*=): string), "www-authenticate": (function(*): *), via: (function(*): *), "record-route": (function(*): string|string), authorization: (function(*): *), path: (function(*): string|string), cseq: (function(*): string), route: (function(*): string|string), contact: (function(*): string), "proxy-authenticate": (function(*): *), from: (function(*=): string), to: (function(*=): string), "proxy-authorization": ((function(*): (*|undefined))|*)}}
  */
 var stringifiers = {
@@ -466,7 +470,7 @@ var stringifiers = {
 
 /**
  * 头域名称首字母变大写
- * @param s
+ * @param s 头域值
  * @returns {string|*}
  */
 function prettifyHeaderName(s) {
@@ -564,10 +568,10 @@ function clone(o, deep) {
 }
 
 /**
- *
- * @param msg
- * @param deep
- * @returns {*[]|*|{reason, headers: (*[]|*), method, uri: (*[]|*), content, status: (*|number|UAStatus|SessionStatus|string|"rejected"|"fulfilled")}}
+ * 拷贝一个新的SIP消息对象并返回
+ * @param msg 被拷贝的SIP消息对象
+ * @param deep 是否深度拷贝
+ * @returns {*[]|*|{reason, headers: (*[]|*), method, uri: (*[]|*), content, status: (*|number|UAStatus|SessionStatus|string|"rejected"|"fulfilled")}} 拷贝后的SIP消息对象
  */
 exports.copyMessage = function(msg, deep) {
   if(deep) return clone(msg, true);
@@ -588,8 +592,8 @@ exports.copyMessage = function(msg, deep) {
 }
 
 /**
- *
- * @param proto
+ * 返回协议的默认端口值，TLS(5061)，其他为5060
+ * @param proto 协议名称
  * @returns {number}
  */
 function defaultPort(proto) {
@@ -599,7 +603,7 @@ function defaultPort(proto) {
 /**
  *
  * @param onMessage
- * @param onFlood
+ * @param onFlood 告警回调函数，如果出现流量过大情况，调用该函数终止流处理
  * @param maxBytesHeaders
  * @param maxContentLength
  * @returns {(function(*=): void)|*}
@@ -613,7 +617,10 @@ function makeStreamParser(onMessage, onFlood, maxBytesHeaders, maxContentLength)
   var m;
   var r = '';
 
-  // 头数据分析处理回调函数
+  /**
+   * 头数据分析处理回调函数
+   * @param data 字符串
+   */
   function headers(data) {
     r += data;
 
@@ -627,6 +634,7 @@ function makeStreamParser(onMessage, onFlood, maxBytesHeaders, maxContentLength)
 
     }
 
+    // 是否收到\r\n\r\n标识，改标识为SIP头已经接收完毕，下面的数据为SIP消息体或者下一个SIP头
     var a = r.match(/^\s*([\S\s]*?)\r\n\r\n([\S\s]*)$/);
 
     if(a) {
@@ -653,13 +661,16 @@ function makeStreamParser(onMessage, onFlood, maxBytesHeaders, maxContentLength)
 
   // 消息体数据处理分析回调函数
   function content(data) {
-    r += data;
+    r += data; // 将新收到的数据追加到旧的未处理的数据后面
 
     if(r.length >= m.headers['content-length']) {
+      // 根据 content-length 提取消息体
       m.content = r.substring(0, m.headers['content-length']);
 
+      // 调用回调函数将收到的SIP对象返回给上层处理
       onMessage(m);
 
+      // 提取出剩下的数据，并调用 headers 头进行处理
       var s = r.substring(m.headers['content-length']);
       state = headers;
       r = '';
@@ -670,15 +681,16 @@ function makeStreamParser(onMessage, onFlood, maxBytesHeaders, maxContentLength)
   // 默认正在处理头数据
   var state=headers;
 
+  // 开始处理收到的数据
   return function(data) { state(data); }
 
 }
 exports.makeStreamParser = makeStreamParser;
 
 /**
- *
- * @param s
- * @returns {{}}
+ * SIP消息处理函数，可以针对UDP等非流式的数据进行处理，一次执行就判断是否能否解析
+ * @param s 待解析的字符串
+ * @returns {{}} 返回解析成功的SIP消息对象
  */
 function parseMessage(s) {
   var r = s.toString('binary').match(/^\s*([\S\s]*?)\r\n\r\n([\S\s]*)$/);
@@ -717,11 +729,11 @@ function checkMessage(msg) {
 }
 
 /**
- *
- * @param protocol
- * @param maxBytesHeaders
- * @param maxContentLength
- * @param connect 具体的连接回调函数，tcp就是net.connect函数
+ * 创建一种流式传输的管理实体
+ * @param protocol 流式协议类型，可以是TCP/TLS/WS或者其他类型
+ * @param maxBytesHeaders 流数据处理中规定能处理的最大的起始行+头域数据的长度
+ * @param maxContentLength 流数据处理中规定的能处理的最大的消息体的长度
+ * @param connect 具体的客户端连接回调函数，tcp就是net.connect函数，用于与外部建立流式连接
  * @param createServer 创建流服务的函数，例如可以创建一个TCP服务器，接收TCP连接
  * @param callback 收到的SIP消息的回调处理函数，目前来自事务层，也可以来自应用层？
  * @returns {{get: (function(*, *=)), destroy: destroy, transport: string, open: ((function(*=, *=): *)|*)}}
@@ -734,7 +746,7 @@ function makeStreamTransport(protocol, maxBytesHeaders, maxContentLength, connec
    *
    * @param stream:net.Socket 与远端新建立的TCP连接套接字net.Socket
    * @param remote 流的远程连接地址信息
-   * @returns {*}
+   * @returns {*} 流式连接的回调函数数组，包括错误处理函数、数据发送函数、流释放处理函数
    */
   function init(stream, remote) {
     // IP,port 作为ID，标识一个流
@@ -743,7 +755,7 @@ function makeStreamTransport(protocol, maxBytesHeaders, maxContentLength, connec
     refs = 0;
 
     /**
-     *
+     * 注册流到 flows MAP中，进行管理
      */
     function register_flow() {
       // remoteIP,remotePort,localIP,localPort 标识一个flow
@@ -800,9 +812,9 @@ function makeStreamTransport(protocol, maxBytesHeaders, maxContentLength, connec
     stream.setMaxListeners(10000);
 
     /**
-     *
-     * @param onError
-     * @returns {{protocol, release: NodeJS.Process.release, send: send}}
+     * 每个流式连接的回调函数数组，包括错误处理函数、数据发送函数、流释放处理函数
+     * @param onError 流的错误处理回调函数，当该流出现异常时，该函数会被调用
+     * @returns {{protocol, release: NodeJS.Process.release, send: send}} 返回该流式连接的回调函数数组
      */
     remotes[remoteid] = function(onError) {
       ++refs;
@@ -815,7 +827,7 @@ function makeStreamTransport(protocol, maxBytesHeaders, maxContentLength, connec
         },
         /**
          * 流式传输协议实际发送数据的地方
-         * @param m
+         * @param m 要发送的SIP消息对象
          */
         send: function(m) {
           stream.write(stringify(m), 'binary');
@@ -833,18 +845,18 @@ function makeStreamTransport(protocol, maxBytesHeaders, maxContentLength, connec
   var server = createServer(
     /**
      * 连接监听函数，当一个远程的TCP连接请求被接受后，将会创建一个流套接字，通过改监听函数返回给上层
-     * @param stream
+     * @param stream 底层的流式套接字，比如TCP的Socket，记载着本地和远程双方的信息
      */
     function(stream) {
     init(stream, {protocol: protocol, address: stream.remoteAddress, port: stream.remotePort});
   });
 
   return {
-    transport: protocol+"Listener",
+    transport: protocol+" TranslateLayout",
     /**
-     * 流传输层，打开与远程端口的连接
-     * @param remote
-     * @param error
+     * 流传输层，打开与远程端口的连接，当需要主动连接到其他服务器时调用这个函数获取流地址
+     * @param remote 要连接的远程服务器的信息对象，包含 address, port protocol 字段
+     * @param error 错误处理回调函数，当打开该流失败时，调用该函数进行处理
      * @returns {*}
      */
     open: function(remote, error) {
@@ -855,7 +867,7 @@ function makeStreamTransport(protocol, maxBytesHeaders, maxContentLength, connec
       return init(connect(remote.port, remote.address), remote)(error);
     },
     /**
-     *
+     * 获取
      * @param address
      * @param error
      * @returns {*}
@@ -874,9 +886,9 @@ function makeStreamTransport(protocol, maxBytesHeaders, maxContentLength, connec
 }
 
 /**
- *
- * @param options
- * @param callback
+ * 创建创建TLS协议传输层管理对象，监听TCP端口，接受且维护管理连接，并收发数据
+ * @param options 参数
+ * @param callback 回调函数，用于收到数据时调用该函数将数据返回给上层处理
  * @returns {{get: (function(*, *=)), destroy: destroy, transport: string, open: ((function(*=, *=): *)|*)}}
  */
 function makeTlsTransport(options, callback) {
@@ -897,9 +909,9 @@ function makeTlsTransport(options, callback) {
 }
 
 /**
- * 创建创建TCP传输层，监听TCP端口，接受连接，并收发数据
- * @param options
- * @param callback
+ * 创建创建TCP协议传输层管理对象，监听TCP端口，接受且维护管理连接，并收发数据
+ * @param options 参数
+ * @param callback 回调函数，用于收到数据时调用该函数将数据返回给上层处理
  * @returns {{get: (function(*, *=)), destroy: destroy, open: ((function(*=, *=): (*))|*)}}
  */
 function makeTcpTransport(options, callback) {
@@ -909,10 +921,10 @@ function makeTcpTransport(options, callback) {
     options.maxContentLength,
     /**
      * 流连接回调函数，根据选择的协议不同，有不同的启动连接的方式
-     * @param port
-     * @param host
-     * @param callback
-     * @returns {Socket}
+     * @param port 远程端口
+     * @param host 远程地址
+     * @param callback 连接失败的错误处理回调函数
+     * @returns {Socket} 连接成功时返回流信息
      */
     function(port, host, callback) { return net.connect(port, host, callback); },
     /**
@@ -932,18 +944,20 @@ function makeTcpTransport(options, callback) {
 }
 
 /**
- * 创建WebSocket传输层，监听WS端口，接受WS连接
- * @param options
- * @param callback
+ * 创建创建WebSocket协议传输层管理对象，监听WS端口，接受且维护管理连接，并收发数据
+ * @param options 参数
+ * @param callback 回调函数，用于收到数据时调用该函数将数据返回给上层处理
  * @returns {{get: ((function(*=, *=): ({protocol: string, release: function(), send: function(*=): void}|undefined))|*), destroy: destroy, open: ((function(*=, *=): ({protocol: string, release: function(), send: function(*=): void}|undefined))|*)}}
  */
 function makeWsTransport(options, callback) {
+  // 已经建立的WS连接数组
   var flows = Object.create(null);
+  // 与远程服务器建立的WS连接数组
   var clients = Object.create(null);
 
   /**
-   *
-   * @param ws
+   * 初始化新创建连接，将连接放入数组中管理，并且监听消息到来事件
+   * @param ws 新的WS连接对象
    */
   function init(ws) {
     var remote = {address: ws._socket.remoteAddress, port: ws._socket.remotePort},
@@ -962,7 +976,7 @@ function makeWsTransport(options, callback) {
   }
 
   /**
-   *
+   * 创建与远程服务器的WS连接
    * @param uri
    * @returns {(function(*=): {protocol: string, release: function(): void, send: function(*=): void})|*}
    */
@@ -982,8 +996,8 @@ function makeWsTransport(options, callback) {
     }
 
     /**
-     *
-     * @param m
+     * 往WS连接中发送SIP消息
+     * @param m 消息可以是字符串类型或者是对象类型
      */
     function send_open(m) {
       socket.send(new Buffer.from(typeof m === 'string' ? m : stringify(m), 'binary'));
@@ -1017,6 +1031,7 @@ function makeWsTransport(options, callback) {
     return clients[uri] = open;
   }
 
+  // 打开WS协议监听函数
   if(options.ws_port) {
     if(options.tls) {
       var http = require('https');
@@ -1038,8 +1053,8 @@ function makeWsTransport(options, callback) {
   }
 
   /**
-   *
-   * @param flow
+   * 根据传入flow对象里的信息，查找对应的WS流
+   * @param flow flow.address, flow.port, flow.local.address, flow.local.port 这些参数要存在
    * @returns {{protocol: string, release: NodeJS.Process.release, send: send}}
    */
   function get(flow) {
@@ -1059,12 +1074,13 @@ function makeWsTransport(options, callback) {
   }
 
   /**
-   *
+   * 建立或查找与远端WS的WS连接，有则找到
    * @param target
    * @param onError
    * @returns {{protocol: string, release: (function(): void), send: (function(*=): void)}|{protocol: string, release: NodeJS.Process.release, send: send}}
    */
   function open(target, onError) {
+    // 如果有本地信息，说明WS建立成功，否则就新建与远程服务器的WS连接
     if(target.local)
       return get(target);
     else
@@ -1079,9 +1095,9 @@ function makeWsTransport(options, callback) {
 }
 
 /**
- *
- * @param options
- * @param callback
+ * 创建UDP协议传输管理者对象
+ * @param options 参数
+ * @param callback 回调函数，用于收到数据时调用该函数将数据返回给上层处理
  * @returns {{get: (function(*, *): {protocol: string, release: function(), send: function(*=): void}), destroy: destroy, open: (function(*, *): {protocol: string, release: function(), send: function(*=): void})}}
  */
 function makeUdpTransport(options, callback) {
@@ -1143,10 +1159,10 @@ function makeUdpTransport(options, callback) {
 }
 
 /**
- * 创建传输层对象
+ * 创建传输层管理者对象
  * @param options 参数
  * @param callback 回调函数用于接收SIP消息
- * @returns {{get: (function(*=, *=)), destroy: destroy, send: send, open: (function(*=, *=): any)}}
+ * @returns {{get: (function(*=, *=)), destroy: destroy, send: send, open: (function(*=, *=): any)}} open函数用于建立与远程的连接，get函数用于具体的传输通道对象，send函数用于往具体的传输通道中写入数据
  */
 function makeTransport(options, callback) {
   var protocols = {};
@@ -1169,10 +1185,10 @@ function makeTransport(options, callback) {
     protocols.WS = makeWsTransport(options, callbackAndLog);
 
   /**
-   *
-   * @param obj
-   * @param target
-   * @returns {*}
+   * 根据传入的对象重新生成一个对象，创建了一个send回调函数，对收到的SIP消息做了些赋值处理，后调用obj的send函数发送SIP消息，但是实际上obj.send也不是最终的发送函数
+   * @param obj 传输层套接字对象
+   * @param target 传输层对象，包含通信双方的协议类型，IP地址和端口信息
+   * @returns {*} 返回根据obj新创建的一个对象
    */
   function wrap(obj, target) {
     return Object.create(obj, {send: {value: function(m) {
@@ -1192,19 +1208,19 @@ function makeTransport(options, callback) {
 
   return {
     /**
-     *
-     * @param target
-     * @param error
-     * @returns {*}
+     * 根据传入的 target 对象在 protocols 中查找具体的传输对象，并调用传输对象的 open 函数打开传输通道
+     * @param target 是传输层返回上来的 remote 信息，记录着传输的协议类型，本地和远程的IP地址和端口号信息
+     * @param error 错误处理回调函数
+     * @returns {*} 返回打开的传输通道对象，里面包含重要的 send 函数，可以用来发送数据
      */
     open: function(target, error) {
       return wrap(protocols[target.protocol.toUpperCase()].open(target, error), target);
     },
     /**
-     *
-     * @param target 是传输层返回上来的 remote 信息
-     * @param error
-     * @returns {any}
+     * 根据传入的 target 对象在 protocols 中查找具体的传输协议管理者对象，并调用传输对象的 get 函数获取具体的传输通道对象
+     * @param target 是传输层返回上来的 remote 信息，记录着传输的协议类型，本地和远程的IP地址和端口号信息
+     * @param error 错误处理回调函数
+     * @returns {any} 返回找到的的传输通道对象，里面包含重要的 send 函数，可以用来发送数据
      */
     get: function(target, error) {
       let transport = protocols[target.protocol.toUpperCase()];
@@ -1212,9 +1228,9 @@ function makeTransport(options, callback) {
       return flow && wrap(flow, target);
     },
     /**
-     *
-     * @param target
-     * @param message
+     * 通过传输层管理者直接向指定的目标发送SIP消息对象
+     * @param target 指定的目标信息，应该包括协议类型，远程HOST信息
+     * @param message 要发生的SIP消息对象
      */
     send: function(target, message) {
       var cn = this.open(target);
@@ -1239,7 +1255,7 @@ function makeTransport(options, callback) {
 exports.makeTransport = makeTransport;
 
 /**
- *
+ * DNS域名解析用？
  * @param resolve
  * @returns {(function(*=, *=): void)|*}
  */
@@ -1972,7 +1988,7 @@ function sequentialSearch(transaction, connect, addresses, rq, callback) {
 }
 
 /**
- *
+ * 创建SIP协议栈对象，里面包含了 Transport 处理成和 Transaction 处理层
  * @param options 启动参数
  * @param callback(msg, remote, stream):void 应用层的回调函数，用于处理收到的SIP消息，msg收到的SIP消息对象，remote里面有对端连接信息，stream在流连接时有用
  * @returns {{hostname: (function(): *|string), decodeFlowUri: (function(*=): {protocol: string, address: string, port: number, local: {address: string, port: number}}|undefined), uas: module:events.EventEmitter, destroy: destroy, send: send, encodeFlowUri: (function(*=): {schema: string, host: *|string, params: {}, user: *}), isFlowUri: (function(*=): boolean)}}
@@ -2146,7 +2162,7 @@ exports.create = function(options, callback) {
       return !!!decodeFlowUri(uri);
     },
     /**
-     *
+     * 返回设置给程序的域名信息，如果域名信息不存在则用是IP地址
      * @returns {*|string}
      */
     hostname: function() { return hostname; },
