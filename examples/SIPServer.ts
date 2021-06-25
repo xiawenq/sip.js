@@ -40,6 +40,13 @@ function makeDialogId(sipMsg, toTag) {
   [sipMsg.headers['call-id'], sipMsg.headers.from.params.tag, toTag].join();
 }
 
+/**
+ * 随机生成tag值
+ * @returns {string}
+ */
+function generateTag() {
+  return [(Math.random()+1).toString(36).substring(2)].join('');
+}
 // 上下文
 let context = {
   // UAS的域ID
@@ -107,6 +114,8 @@ context._this.on('REGISTER', (rq, remote)=> {
     // 没有登记的用户，这里直接禁止授权
     logger.error('没有登记的用户，这里直接禁止授权:' , username);
     let session = {realm: context.realm};
+    if (!rq.headers.to.params.tag || rq.headers.to.params.tag === '')
+      rq.headers.to.params.tag = generateTag();
     sip.send(digest.challenge(session, sip.makeResponse(rq, 401, 'Unauthorized')), function (m) {
       if (m) {
         logger.warn(m);
@@ -117,6 +126,8 @@ context._this.on('REGISTER', (rq, remote)=> {
   else {
     // 这里应该对server_account再校验一下。但有的网上测试IPC程序server_account没用到uri里。这里先简单实现下原理。
     userInfo.session = userInfo.session || {realm: context.realm};
+    if (!rq.headers.to.params.tag || rq.headers.to.params.tag === '')
+      rq.headers.to.params.tag = generateTag();
     if(!digest.authenticateRequest(userInfo.session, rq, {user: username, password: userInfo.password})) {
       sip.send(digest.challenge(userInfo.session, sip.makeResponse(rq, 401, 'Unauthorized')));
     }
@@ -174,6 +185,8 @@ context._this.on('MESSAGE', (rq, remote)=> {
     sip.send(sip.makeResponse(rq, 200, 'ok'));
   }
   else if (jsc['Notify'] && jsc['Notify']['CmdType'] && jsc['Notify']['CmdType']._text === 'Keepalive') {
+    if (!rq.headers.to.params.tag || rq.headers.to.params.tag === '')
+      rq.headers.to.params.tag = generateTag();
     sip.send(sip.makeResponse(rq, 200, 'ok'));
 
     // var requestMsg = {
