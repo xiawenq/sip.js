@@ -90,7 +90,7 @@ var registry = {
   '34020000002000000011' : {password: "Pg0YXL0V"}
 };
 
-debugger;
+// debugger;
 
 logger.info('localhost name=%s',context.realm);
 
@@ -197,10 +197,10 @@ sip.start(
   {
     logger: {
       send: function(message, address) {
-        logger.info("==send==:" , message,address);
+        logger.info("\n==send==:\n" , sip.stringify(message),address);
       },
       recv: function(message, address) {
-        logger.info("==recv==:" , message,address);
+        logger.info("\n==recv==:\n" , sip.stringify(message),address);
       },
       trace: function(m, ...a) {
         logger.trace(m, ...a);
@@ -270,8 +270,8 @@ const figlet = require("figlet");
 const init = () => {
   console.log(
     chalk.green(
-      figlet.textSync("Node JS CLI", {
-        font: "Ghost",
+      figlet.textSync("SIP Server CLI", {
+        font: "Henry 3D",
         horizontalLayout: "default",
         verticalLayout: "default"
       })
@@ -279,8 +279,11 @@ const init = () => {
   );
 };
 
-const helpMessage = "\n输出帮助\n" +
-  "world a b c\n";
+const helpMessage = "help 输出帮助\n" +
+  "conn\n" +
+  "close\n" +
+  "notify\n" +
+  "";
 init();
 
 function readSyncByRl(tips) {
@@ -298,7 +301,7 @@ function readSyncByRl(tips) {
     });
   });
 }
-async function a() {
+async function main() {
   console.log(helpMessage)
   while(1) {
     let con = true;
@@ -315,4 +318,4 @@ async function a() {
     }
   }
 }
-a().then(r => {});
+main().then(r => {});
