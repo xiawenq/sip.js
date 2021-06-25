@@ -328,6 +328,24 @@ function parseUri(s) {
 exports.parseUri = parseUri;
 
 /**
+ * 将to和from字段中的端口号替换成正确的端口号，用于客户端与服务器建立连接后第一次发送消息时用到
+ * @param m SIP消息对象
+ * @param port 正确的端口号
+ */
+function replacePort(m, port) {
+  let from = parseUri(m.headers.from.uri)
+  if (from.port === 0) {
+    from.port = port;
+    m.headers.from.uri = stringifyUri(from);
+  }
+  if (m.method === 'REGISTER') {
+    let to = parseUri(m.headers.to.uri)
+    to.port = port;
+    m.headers.to.uri = stringifyUri(to);
+  }
+  var s = stringify(m);
+}
+/**
  * 校验版本号是否存在，否在返回默认版本号 2.0
  * @param v
  * @returns {string}
@@ -830,6 +848,7 @@ function makeStreamTransport(protocol, maxBytesHeaders, maxContentLength, connec
          * @param m 要发送的SIP消息对象
          */
         send: function(m) {
+          replacePort(m, stream.localPort);
           stream.write(stringify(m), 'binary');
         },
         protocol: protocol
@@ -1144,6 +1163,7 @@ function makeUdpTransport(options, callback) {
        * @param m 消息对象，通过 stringify构造成字符串格式
        */
       send: function(m) {
+        replacePort(m, port);
         var s = stringify(m);
         socket.send(new Buffer.from(s, 'binary'), 0, s.length, remote.port, remote.address);
       },
