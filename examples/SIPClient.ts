@@ -62,6 +62,7 @@ main().then(r => {});
 let sip = require('../sip');
 let digest = require('../digest');
 let util = require('util');
+let Convert = require('xml-js')
 
 os.networkInterfaces()
 
@@ -72,29 +73,6 @@ os.networkInterfaces()
  * 4. 准备下线函数，可以随时让设备下线
  * 5.
  */
-let demo = {
-  method: undefined,
-  uri: undefined,//'sip:34020000002000000011@192.168.123.111:5060;transport=TCP',
-  headers: {
-    via: undefined,
-    to: {
-      uri: undefined,//'sip:34020000002000000011@127.0.0.1',
-      tag: undefined,
-    },
-    from: {
-      uri: undefined,//'sip:34020000002000000011@127.0.0.1',
-      tag: undefined,
-    },
-    cseq: {
-      method: undefined,//"REGISTER",
-      seq: undefined
-    },
-    'call-id': undefined,
-    contact: undefined,//[{uri: 'sip:101@somewhere.local', params: {expires: 300}}],
-    'content-length': 0
-  },
-  content: undefined
-}
 
 // 建立的对话数组
 let dialogs = {};
@@ -110,15 +88,36 @@ type Device = {
   deviceAccount, // 设备认证账号
   devicePassword // 设备认证密码
   localAddress, // 本机IP地址
+  localPort,
+  heartbeat,
   // runtime variable
   CSeq,
+  SN,
   status,
-  callId,
+  failed
 }
 type Status = 'OffLine'|'OnRegister'|'OnLine'
 type MethodType = 'REGISTER'|'INVITE'|'ACK'|'CANCEL'|'BYE'|'OPTIONS'|'INFO'|'SUBSCRIBE'|'NOTIFY'|'MESSAGE'
 
 function rstring() { return Math.floor(Math.random()*1e6).toString(); }
+
+/**
+ * 根据请求创建对话ID，用于标识一组对话
+ * @param sipMsg SIP消息对象
+ * @param toTag to.tag值
+ */
+function makeDialogId(sipMsg, toTag) {
+  toTag = sipMsg.headers.to.params.tag || toTag;
+  [sipMsg.headers['call-id'], sipMsg.headers.from.params.tag, toTag].join();
+}
+
+/**
+ * 随机生成tag值
+ * @returns {string}
+ */
+function generateTag() {
+  return [(Math.random()+1).toString(36).substring(2)].join('');
+}
 
 sip.start({
     logger: {
@@ -155,10 +154,47 @@ sip.start({
  */
 function makeRequest(method: MethodType, device: Device, extension: any) {
   if (!method || !device) return;
-  let rq = demo;
+  let rq = {
+    method: undefined,
+    uri: undefined,//'sip:34020000002000000011@192.168.123.111:5060;transport=TCP',
+    headers: {
+      via: undefined,
+      to: {
+        uri: undefined,//'sip:34020000002000000011@127.0.0.1',
+        params: {
+          tag: undefined,
+        }
+      },
+      from: {
+        uri: undefined,//'sip:34020000002000000011@127.0.0.1',
+        params: {
+          tag: undefined,
+        }
+      },
+      'call-id': undefined,
+      cseq: {
+        method: undefined,//"REGISTER",
+        seq: undefined
+      },
+      contact: undefined,//[{uri: 'sip:101@somewhere.local', params: {expires: 300}}],
+      'content-length': 0
+    },
+    content: undefined
+  }
+
+  if(extension) {
+    if(extension.headers) Object.keys(extension.headers).forEach(function(h) {
+      rq.headers[h] = extension.headers[h];
+    });
+    rq.content = extension.content;
+    if (rq.content)
+      rq.headers["content-length"] = rq.content.length;
+  }
+
   let uri = 'sip:'+device.serverCode+'@'+device.serverAddress+':'+device.serverPort
   let toUri = uri;
-  let fromUri = 'sip:'+device.deviceCode+'@'+device.localAddress
+  let fromUri = 'sip:'+device.deviceCode+'@'+device.localAddress+':'+device.localPort;
+  let transport = device.protocol.toLowerCase() === 'tcp' ? ';transport=tcp' : ';transport=udp'
 
   switch (method) {
     case "REGISTER":
@@ -173,34 +209,21 @@ function makeRequest(method: MethodType, device: Device, extension: any) {
     case "NOTIFY":
     case "OPTIONS":
     case "SUBSCRIBE":
+      break;
     default:
       console.log('UnSupport method: ' + method);
       return
   }
-  rq.headers.cseq.method = rq.method = method;
-  rq.uri = uri;
-  rq.headers.from.uri = fromUri;
-  rq.headers.to.uri = toUri;
+  if (!rq.headers.cseq.method) rq.headers.cseq.method = method;
+  if (!rq.headers.cseq.seq) rq.headers.cseq.seq = device.CSeq++;
+  if (!rq.method) rq.method = method;
+  if (!rq.uri) rq.uri = uri;
+  if (!rq.headers.from.uri) rq.headers.from.uri = fromUri;
+  if (!rq.headers.to.uri) rq.headers.to.uri = toUri;
 
-  rq.headers['call-id'] = '123456'
-  rq.headers.contact = [{uri: 'sip:101@somewhere.local', params: {expires: 300}}]
-  if(extension) {
-    if(extension.headers) Object.keys(extension.headers).forEach(function(h) {
-      // Object.keys(extension.headers[h]).forEach((s)=>{
-      //   rq.headers[h][s] = extension.headers[h][s];
-      // })
-      rq.headers[h] = extension.headers[h];
-    });
-    rq.content = extension.content;
-    if (rq.content)
-      rq.headers["content-length"] = rq.content.length;
-  }
-  // if (extension.headers && extension.headers.cseq && extension.headers.cseq.seq)
-  //   rq.headers.cseq.seq = extension.headers.cseq.seq
-  if (!rq.headers.cseq.seq)
-    rq.headers.cseq.seq = device.CSeq++;
+  if (!rq.headers['call-id']) rq.headers['call-id'] = generateTag();
+  if (!rq.headers.contact) rq.headers.contact = [{uri: 'sip:101@somewhere.local', params: {expires: 300}}]
 
-  let transport = device.protocol.toLowerCase() === 'tcp' ? ';transport=tcp' : ';transport=udp'
   rq.uri = rq.uri + transport
 
   return rq;
@@ -209,65 +232,71 @@ devices['34020000002000000011'] = {
   serverCode: '34020000002000000001',
   serverAddress: '192.168.123.138',
   serverPort: 5060,
-  protocol: 'tcp',
+  protocol: 'udp',
   deviceCode: '34020000002000000011',
   deviceAccount:'34020000002000000011',
   devicePassword: 'Pg0YXL0V',
-  localAddress: '192.168.123.111',
+  localAddress: '192.168.123.138',
+  localPort: 0,
+  heartbeat: 30,
   status: 'OffLine',
-  CSeq: 1
+  CSeq: 1,
+  SN: 1,
+  failed: 0
 }
-// let msg = makeRequest("REGISTER", devices['34020000002000000011'], {
-//   headers: {
-//     cseq: {seq: 30},
-//     from: {
-//       uri: "sip:12345@192.168.123.1",
-//       tag: '123123123123',
-//     },
-//   },
-//   content: '<?xml version="1.0" encoding="GB2312"?>\r\n' +
-//     '<Notify>\r\n' +
-//     '<CmdType>Keepalive</CmdType>\r\n' +
-//     '<SN>49</SN>\r\n' +
-//     '<DeviceID>34020000002000000011</DeviceID>\r\n' +
-//     '<Status>OK</Status>\r\n' +
-//     '</Notify>\r\n'
-// })
-// console.log(msg);
-// console.log(sip.stringify(msg))
+
 register(devices['34020000002000000011'])
 /**
  * 注册设备
  * @param device
+ * @param retryMsg
  */
-function register(device: Device) {
-  let rq = makeRequest("REGISTER", device, {
+function register(device: Device, retryMsg?) {
+  let rq = retryMsg ? retryMsg : makeRequest("REGISTER", device, {
     headers: {
+      from: {
+        uri: '',
+        params: {
+          tag: generateTag()
+        },
+      },
+      'call-id': generateTag()
     }});
+  // 第一次发送注册包
   sip.send(rq, (rs, remote)=> {
     try {
+      // @ts-ignore
+      rq.headers.via.pop();
       if (rs.status === 401 || rs.status === 407) {
-        // @ts-ignore
-        rq.headers.via.pop();
         rq.headers.cseq.seq++;
+        device.CSeq++;
+        if (device.localPort !== sip.parseUri(rq.headers.from.uri).port)
+          device.localPort = sip.parseUri(rq.headers.from.uri).port
         let context = {}
+        // 算法认证后第二次发送注册包
         digest.signRequest(context, rq, rs, {user: device.deviceCode, password: device.devicePassword});
         sip.send(rq, (rs1, remote1)=>{
           // @ts-ignore
           if (200 <= rs1.status < 300) {
             if (false === digest.authenticateResponse(context, rs))
               console.log('failed to authenticate server');
-            else
+            else {
               console.log('REGISTER ok');
+              keepalive(device);
+            }
           }
         });
       }
-      else { // @ts-ignore
+      else {
+        // @ts-ignore
         if (300 > rs.status >= 200) {
           console.log("Ok");
         }
         else {
           console.log('failed to register\r\n' + rs);
+          setTimeout(()=>{
+            register(device, rq)
+          }, 5*1000);
         }
       }
     }
@@ -279,11 +308,79 @@ function register(device: Device) {
 }
 
 /**
+ * 异步调用函数,注意：要求第一个参数回调函数
+ * @static
+ * @param {function} paramFunc 要调用的函数
+ * @param {...args} args 要调用的参数
+ * @return {...args} 返回回调函数的传入参数列表
+ */
+async function WaitFunction(paramFunc, ...args) {
+  return new Promise((resolve) => {
+    paramFunc((...result) => {
+      resolve(result);
+    }, ...args);
+  });
+}
+
+/**
  * 定时心跳上报及处理函数
  * @param device
  */
 async function keepalive(device: Device) {
-
+  let body = {
+    _declaration: {
+      _attributes: {
+        version: '1.0'
+      }
+    },
+    Notify: {
+      CmdType: 'Keepalive',
+      SN: device.SN++,
+      DeviceID: device.deviceCode,
+      Status: 'OK'
+    }
+  }
+  let stringB = Convert.js2xml(body, {compact: true});
+  console.log('content: ' + stringB)
+  let rq = makeRequest("MESSAGE", device, {
+    headers: {
+      from: {
+        uri: '',
+        params: {
+          tag: generateTag()
+        }
+      },
+      'call-id': generateTag(),
+      'Content-Type': 'Application/MANSCDP+xml'
+    },
+    content: stringB
+  });
+  // 第一次发送注册包
+  sip.send(rq, (rs, remote)=> {
+    try {
+      if (rs.status != 200) {
+        console.info("recv non 200 ok response from server for keepalive message.");
+        device.failed++;
+      }
+      else {
+        console.log("keepalive ok");
+      }
+      if (device.failed >= 3) {
+        console.warn("device offline!!!!");
+        device.status = 'Offline';
+        device.failed = 0;
+        register(device);
+        return;
+      }
+      setTimeout(()=>{
+        keepalive(device)
+      }, device.heartbeat*1000);
+    }
+    catch (e) {
+      console.log(e);
+      console.log(e.stack);
+    }
+  })
 }
 
 /**
