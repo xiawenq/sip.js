@@ -49,6 +49,9 @@ async function main() {
       }
       else if (res === 'help')
         console.log(helpMessage)
+      else if (res === 'notify') {
+        notify(devices['34020000002000000011'])
+      }
     });
     if (!con) {
       console.log("exit ok");
@@ -79,9 +82,9 @@ let dialogs = {};
 // 需要注册的设备信息
 let devices:Device[] = [];
 type Device = {
-  serverCode, // SIP服务器编码
-  serverAddress, // SIP服务器IP
-  serverPort, // SIP服务器端口
+  remoteCode, // SIP服务器编码
+  remoteAddress, // SIP服务器IP
+  remotePort, // SIP服务器端口
   protocol, // 通信协议
 
   deviceCode, // 设备编码
@@ -191,7 +194,7 @@ function makeRequest(method: MethodType, device: Device, extension: any) {
       rq.headers["content-length"] = rq.content.length;
   }
 
-  let uri = 'sip:'+device.serverCode+'@'+device.serverAddress+':'+device.serverPort
+  let uri = 'sip:'+device.remoteCode+'@'+device.remoteAddress+':'+device.remotePort
   let toUri = uri;
   let fromUri = 'sip:'+device.deviceCode+'@'+device.localAddress+':'+device.localPort;
   let transport = device.protocol.toLowerCase() === 'tcp' ? ';transport=tcp' : ';transport=udp'
@@ -229,14 +232,14 @@ function makeRequest(method: MethodType, device: Device, extension: any) {
   return rq;
 }
 devices['34020000002000000011'] = {
-  serverCode: '34020000002000000001',
-  serverAddress: '192.168.123.138',
-  serverPort: 5060,
+  remoteCode: '34020000002000000001',
+  remoteAddress: '192.168.123.111',
+  remotePort: 5060,
   protocol: 'udp',
   deviceCode: '34020000002000000011',
   deviceAccount:'34020000002000000011',
   devicePassword: 'Pg0YXL0V',
-  localAddress: '192.168.123.138',
+  localAddress: '192.168.123.111',
   localPort: 0,
   heartbeat: 30,
   status: 'OffLine',
@@ -246,6 +249,7 @@ devices['34020000002000000011'] = {
 }
 
 register(devices['34020000002000000011'])
+
 /**
  * 注册设备
  * @param device
@@ -305,21 +309,6 @@ function register(device: Device, retryMsg?) {
       console.log(e.stack);
     }
   })
-}
-
-/**
- * 异步调用函数,注意：要求第一个参数回调函数
- * @static
- * @param {function} paramFunc 要调用的函数
- * @param {...args} args 要调用的参数
- * @return {...args} 返回回调函数的传入参数列表
- */
-async function WaitFunction(paramFunc, ...args) {
-  return new Promise((resolve) => {
-    paramFunc((...result) => {
-      resolve(result);
-    }, ...args);
-  });
 }
 
 /**
@@ -388,5 +377,49 @@ async function keepalive(device: Device) {
  * @param device
  */
 function notify(device: Device) {
-
+  let body = {
+    _declaration: {
+      _attributes: {
+        version: '1.0'
+      }
+    },
+    Notify: {
+      CmdType: 'Alarm',
+      SN: device.SN++,
+      DeviceID: device.deviceCode,
+      AlarmPriority: 4,
+      AlarmTime: new Date().toISOString(),
+      AlarmMethod: 2
+    }
+  }
+  let stringB = Convert.js2xml(body, {compact: true});
+  console.log('content: ' + stringB)
+  let rq = makeRequest("MESSAGE", device, {
+    headers: {
+      from: {
+        uri: '',
+        params: {
+          tag: generateTag()
+        }
+      },
+      'call-id': generateTag(),
+      'Content-Type': 'Application/MANSCDP+xml'
+    },
+    content: stringB
+  });
+  // 第一次发送注册包
+  sip.send(rq, (rs, remote)=> {
+    try {
+      if (rs.status != 200) {
+        console.info("recv non 200 ok response from server for alarm message.");
+      }
+      else {
+        console.log("alarm ok");
+      }
+    }
+    catch (e) {
+      console.log(e);
+      console.log(e.stack);
+    }
+  })
 }

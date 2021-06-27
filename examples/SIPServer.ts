@@ -137,6 +137,24 @@ context._this.on('REGISTER', (rq, remote)=> {
       var rs = sip.makeResponse(rq, 200, 'Ok');
       rs.headers.contact = rq.headers.contact;
       sip.send(rs);
+
+      // 记录设备信息
+      devices[username] = {
+        remoteCode: username,
+        remoteAddress: remote.address,
+        remotePort: remote.port,
+        protocol: remote.protocol,
+        deviceCode: context.server_account,
+        deviceAccount: context.server_account,
+        devicePassword: 'Pg0YXL0V',
+        localAddress: remote.local.address,
+        localPort: remote.local.port,
+        heartbeat: 30,
+        status: 'OffLine',
+        CSeq: 1,
+        SN: 1,
+        failed: 0
+      }
     }
   }
 });
@@ -166,6 +184,8 @@ context._this.on('NOTIFY', (rq, remote)=> {
 });
 // 注册 MESSAGE 事件，处理 MESSAGE 请求
 context._this.on('MESSAGE', (rq, remote)=> {
+  if (!rq.headers.to.params.tag || rq.headers.to.params.tag === '')
+    rq.headers.to.params.tag = generateTag();
   logger.info(rq.method);
   // const js = Convert.xml2js(message.content);
   // logger.info(js.declaration);
@@ -184,25 +204,16 @@ context._this.on('MESSAGE', (rq, remote)=> {
   if (jsc['Query'] && jsc['Query']['CmdType'] && jsc['Query']['CmdType']._text === 'RecordInfo') {
     sip.send(sip.makeResponse(rq, 200, 'ok'));
   }
-  else if (jsc['Notify'] && jsc['Notify']['CmdType'] && jsc['Notify']['CmdType']._text === 'Keepalive') {
-    if (!rq.headers.to.params.tag || rq.headers.to.params.tag === '')
-      rq.headers.to.params.tag = generateTag();
-    sip.send(sip.makeResponse(rq, 200, 'ok'));
-
-    // var requestMsg = {
-    //   uri: rq.headers.from.uri,
-    //   method: 'OPTIONS',
-    //   version: "2.0",
-    //   headers: {
-    //     //   via: [{version: "2.0", protocol: 'TCP', host: 'localhost', port: 5060, params: {branch:'12345'}}],
-    //     //   'content-length': 0,
-    //   },
-    //   // content: ''
-    // };
-    // logger.info(requestMsg);
-    // sip.send(requestMsg, (rsp)=> {
-    //   logger.info(sip.stringify(rsp));
-    // })
+  else if (jsc['Notify'] && jsc['Notify']['CmdType']) {
+    let cmdType = jsc['Notify']['CmdType']._text
+    if (cmdType.toLowerCase()  === 'keepalive') {
+      sip.send(sip.makeResponse(rq, 200, 'ok'));
+    }
+    else if (cmdType.toLowerCase() === 'alarm') {
+      sip.send(sip.makeResponse(rq, 200, 'ok'));
+      let username = sip.parseUri(rq.headers.from.uri).user;
+      INVITE(devices[username]);
+    }
   }
 });
 
@@ -240,6 +251,7 @@ sip.start(
     port: 5060,
     hostname: 'localhost',
     user: context.server_account,
+    address: '0.0.0.0',
     ws_port: 5070,
   },
   (rq, remote)=> {
@@ -332,3 +344,151 @@ async function main() {
   }
 }
 main().then(r => {});
+
+// 需要注册的设备信息
+let devices:Device[] = [];
+type Device = {
+  remoteCode, // SIP服务器编码
+  remoteAddress, // SIP服务器IP
+  remotePort, // SIP服务器端口
+  protocol, // 通信协议
+
+  deviceCode, // 设备编码
+  deviceAccount, // 设备认证账号
+  devicePassword // 设备认证密码
+  localAddress, // 本机IP地址
+  localPort,
+  heartbeat,
+  // runtime variable
+  CSeq,
+  SN,
+  status,
+  failed
+}
+type Status = 'OffLine'|'OnRegister'|'OnLine'
+type MethodType = 'REGISTER'|'INVITE'|'ACK'|'CANCEL'|'BYE'|'OPTIONS'|'INFO'|'SUBSCRIBE'|'NOTIFY'|'MESSAGE'
+
+/**
+ * 创建SIP请求消息
+ * @param method 请求方法
+ * @param device 设备信息
+ * @param extension 扩展字段
+ */
+function makeRequest(method: MethodType, device: Device, extension: any) {
+  if (!method || !device) return;
+  let rq = {
+    method: undefined,
+    uri: undefined,//'sip:34020000002000000011@192.168.123.111:5060;transport=TCP',
+    headers: {
+      via: undefined,
+      to: {
+        uri: undefined,//'sip:34020000002000000011@127.0.0.1',
+        params: {
+          tag: undefined,
+        }
+      },
+      from: {
+        uri: undefined,//'sip:34020000002000000011@127.0.0.1',
+        params: {
+          tag: undefined,
+        }
+      },
+      'call-id': undefined,
+      cseq: {
+        method: undefined,//"REGISTER",
+        seq: undefined
+      },
+      contact: undefined,//[{uri: 'sip:101@somewhere.local', params: {expires: 300}}],
+      'content-length': 0
+    },
+    content: undefined
+  }
+
+  if(extension) {
+    if(extension.headers) Object.keys(extension.headers).forEach(function(h) {
+      rq.headers[h] = extension.headers[h];
+    });
+    rq.content = extension.content;
+    if (rq.content)
+      rq.headers["content-length"] = rq.content.length;
+  }
+
+  let uri = 'sip:'+device.remoteCode+'@'+device.remoteAddress+':'+device.remotePort
+  let toUri = uri;
+  let fromUri = 'sip:'+device.deviceCode+'@'+device.localAddress+':'+device.localPort;
+  let transport = device.protocol.toLowerCase() === 'tcp' ? ';transport=tcp' : ';transport=udp'
+
+  switch (method) {
+    case "REGISTER":
+      toUri = fromUri;  // 注册消息时候，from和to字段值一样
+      break;
+    case "INVITE":
+    case "ACK":
+    case "BYE":
+    case "CANCEL":
+    case "INFO":
+    case "MESSAGE":
+    case "NOTIFY":
+    case "OPTIONS":
+    case "SUBSCRIBE":
+      break;
+    default:
+      console.log('UnSupport method: ' + method);
+      return
+  }
+  if (!rq.headers.cseq.method) rq.headers.cseq.method = method;
+  if (!rq.headers.cseq.seq) rq.headers.cseq.seq = device.CSeq++;
+  if (!rq.method) rq.method = method;
+  if (!rq.uri) rq.uri = uri;
+  if (!rq.headers.from.uri) rq.headers.from.uri = fromUri;
+  if (!rq.headers.to.uri) rq.headers.to.uri = toUri;
+
+  if (!rq.headers['call-id']) rq.headers['call-id'] = generateTag();
+  if (!rq.headers.contact) rq.headers.contact = [{uri: 'sip:101@somewhere.local', params: {expires: 300}}]
+
+  rq.uri = rq.uri + transport
+
+  return rq;
+}
+
+function INVITE(device: Device) {
+  let rq = makeRequest("INVITE", device, {
+    headers: {
+      from: {
+        uri: '',
+        params: {
+          tag: generateTag()
+        }
+      },
+      'call-id': generateTag(),
+      'Content-Type': 'application/sdp',
+    },
+    content:
+      'v=0\r\n'+
+      'o=- 13374 13374 IN IP4 172.16.2.2\r\n'+
+      's=-\r\n'+
+      'c=IN IP4 172.16.2.2\r\n'+
+      't=0 0\r\n'+
+      'm=audio 16424 RTP/AVP 0 8 101\r\n'+
+      'a=rtpmap:0 PCMU/8000\r\n'+
+      'a=rtpmap:8 PCMA/8000\r\n'+
+      'a=rtpmap:101 telephone-event/8000\r\n'+
+      'a=fmtp:101 0-15\r\n'+
+      'a=ptime:30\r\n'+
+      'a=sendrecv\r\n'
+  });
+  sip.send(rq, (rs, remote)=> {
+    try {
+      if (rs.status != 200) {
+        console.info("recv non 200 ok response from server for alarm message.");
+      }
+      else {
+        console.log("alarm ok");
+      }
+    }
+    catch (e) {
+      console.log(e);
+      console.log(e.stack);
+    }
+  })
+}
